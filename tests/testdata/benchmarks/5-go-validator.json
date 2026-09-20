@@ -105,7 +105,7 @@
     "clean_ci_wall_ms.go is the GitHub job duration for the five empty-cache matrix jobs in isolated run 35540818238. The workflow disables setup-go caching, assigns a unique empty GOMODCACHE and GOCACHE to every sample, checks out the recorded head explicitly, and uploads the measured head plus inner-command timing. GitHub job timestamps have one-second resolution.",
     "workflow_steps counts explicit `.github/workflows/policy.yml` job `publish` steps in the Stage 2 tree (8). Proposed Stage 3 keeps those 8 steps and swaps composite internals to build+exec the base-owned Go binary with the same `--event`/`--check` flags. The benchmark-only job is not counted.",
     "production_dependencies.python are the plan's trusted-path entries. production_dependencies.go lists direct require directives in go.mod only (not test-only or benchmark tooling). Current inventory: gopkg.in/yaml.v3@v3.0.1.",
-    "go_commit is the exact measured implementation head 36c82f78f27fb8645b491139bc820ed19f3a4b97; the following commit updates evidence only.",
+    "go_commit is the exact measured Go implementation head 36c82f78f27fb8645b491139bc820ed19f3a4b97; subsequent commits update benchmark evidence and the Python replay harness only, leaving measured Go package sources unchanged.",
     "Go clean-CI p95 is 29000 ms versus Python's 9000 ms. The isolated Go job includes checkout, setup-go, downloading gopkg.in/yaml.v3 into an empty module cache, compiling every package into an empty build cache, and artifact upload; this measured regression is advisory and does not retain Python after Stage 3.",
     "Benchmarks are evidence only and do not authorize retaining Python after Stage 3."
   ]
