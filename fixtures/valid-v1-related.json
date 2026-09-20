@@ -1,7 +1,7 @@
 {
   "extends": "valid-high.json",
   "replace": {
-    "pull_request.body": "## Summary\n\nAdd the trusted repository policy validator.\n\n## Changes\n\n- Validate immutable approval and review receipts.\n\n## Impact\n\n- User/runtime: policy failures become visible before merge\n- API/schema/dependencies: adds the repository policy contract\n- Operations/deployment: no production deployment\n- Not changed: pull request heads remain untrusted input\n\n## Verification\n\n- Conformance fixtures — local runner — passed\n- Unverified: none\n\n## Risk and rollback\n\nRisk: high — changes repository policy enforcement\n\nRollback: revert the pull request\n\n## Related\n\nRelated #42\nPlan: .ops/plans/42-policy-validator.md\n",
+    "pull_request.body": "## Summary\n\nAdd the trusted repository policy validator.\n\n## Changes\n\n- Validate immutable approval and review receipts.\n\n## Impact\n\n- User/runtime: policy failures become visible before merge\n- API/schema/dependencies: adds the repository policy contract\n- Operations/deployment: no production deployment\n- Not changed: pull request heads remain untrusted input\n- Changelog: not-required — this fixture exercises receipt validation without a release-note change\n\n## Verification\n\n- Conformance fixtures — local runner — passed\n- Unverified: none\n\n## Risk and rollback\n\nRisk: high — changes repository policy enforcement\n\nRollback: revert the pull request\n\n## Related\n\nRelated #42\nPlan: .ops/plans/42-policy-validator.md\n",
     "intent_comments": [
       {
         "author": "maintainer",

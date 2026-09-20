@@ -1,0 +1,9 @@
+{
+  "extends": "valid-required-fragment.json",
+  "replace": {
+    "file_contents": {
+      "changelog.d/42-validator.md": "## Notes\n- Unsupported section.\n"
+    }
+  },
+  "expected": "content must follow an allowed section heading"
+}

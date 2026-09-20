@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,15 @@ assert SPEC and SPEC.loader
 validator = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = validator
 SPEC.loader.exec_module(validator)
+
+CHANGELOG_SPEC = importlib.util.spec_from_file_location(
+    "repo_ops_changelog",
+    ROOT / "actions" / "repository-policy" / "changelog.py",
+)
+assert CHANGELOG_SPEC and CHANGELOG_SPEC.loader
+changelog = importlib.util.module_from_spec(CHANGELOG_SPEC)
+sys.modules[CHANGELOG_SPEC.name] = changelog
+CHANGELOG_SPEC.loader.exec_module(changelog)
 
 
 class ValidatorConformanceTests(unittest.TestCase):
@@ -234,6 +244,62 @@ class ValidatorConformanceTests(unittest.TestCase):
         self.assertEqual(42, validator.parse_related_issue(indented))
         self.assertFalse(validator.is_direct_low_risk(indented))
 
+    def test_historical_intent_digest_discussion_is_not_a_legacy_record(self) -> None:
+        self.assertEqual([], self.findings("valid-v1-historical-discussion.json"))
+
+    def test_changelog_declaration_requires_owned_valid_fragment(self) -> None:
+        state = self.v1_state()
+        state["pull_request"]["body"] = state["pull_request"]["body"].replace(
+            "Changelog: not-required — this fixture exercises receipt validation without a release-note change",
+            "Changelog: required — this change needs a release note",
+            1,
+        )
+        state["files"] = [
+            {"filename": "changelog.d/42-validator.md", "status": "added"},
+        ]
+        state["file_contents"] = {
+            "changelog.d/42-validator.md": "## Changed\n- Validate the trusted policy contract.\n"
+        }
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+        state["files"][0]["filename"] = "changelog.d/41-validator.md"
+        self.assertIn(
+            "issue-backed fragment filename must begin with the linked issue number",
+            validator.validate_state(state, self.contract_root),
+        )
+
+    def test_fragment_parser_rejects_empty_bullets_and_unsupported_headings(self) -> None:
+        with self.assertRaises(ValueError):
+            validator._changelog_helpers()(
+                "## Added\n- \n",
+                filename="empty.md",
+            )
+        with self.assertRaises(ValueError):
+            validator._changelog_helpers()(
+                "## Notes\n- Unsupported.\n",
+                filename="unsupported.md",
+            )
+
+    def test_contract_check_is_independent_of_exact_head_merge_receipt(self) -> None:
+        state = self.v1_state()
+        state["comments"] = []
+        self.assertEqual(
+            [],
+            validator.validate_state(state, self.contract_root, check="contract"),
+        )
+        self.assertIn(
+            "no merge-ready receipt was found",
+            validator.validate_state(state, self.contract_root),
+        )
+
+    def test_high_risk_plan_approval_requires_owner_authority(self) -> None:
+        state = self.v1_state()
+        state["comments"][0]["association"] = "MEMBER"
+        self.assertIn(
+            "high-risk plan approval was not posted by an authorized maintainer",
+            validator.validate_state(state, self.contract_root, check="contract"),
+        )
+
     def test_fenced_intent_examples_are_not_authority(self) -> None:
         examples = (
             "```text\n"
@@ -255,6 +321,53 @@ class ValidatorConformanceTests(unittest.TestCase):
 
     def test_valid_low_direct_route(self) -> None:
         self.assertEqual([], self.findings("valid-low-direct.json"))
+
+    def test_folding_is_stable_duplicate_safe_and_consumes_only_fragments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fragments = root / "changelog.d"
+            fragments.mkdir()
+            (fragments / "z-last.md").write_text(
+                "## Added\n- Z entry.\n",
+                encoding="utf-8",
+            )
+            (fragments / "a-first.md").write_text(
+                "## Added\n- A entry.\n",
+                encoding="utf-8",
+            )
+            unrelated = root / "keep.txt"
+            unrelated.write_text("keep", encoding="utf-8")
+            changelog_path = root / "CHANGELOG.md"
+            consumed = changelog.fold_changelog(
+                fragments,
+                changelog_path,
+                version="v0.1.0",
+                date="2026-09-21",
+            )
+            self.assertEqual(["a-first.md", "z-last.md"], [path.name for path in consumed])
+            self.assertEqual(
+                "## [v0.1.0] - 2026-09-21\n\n"
+                "### Added\n"
+                "- A entry.\n"
+                "- Z entry.\n",
+                changelog_path.read_text(encoding="utf-8"),
+            )
+            self.assertFalse((fragments / "a-first.md").exists())
+            self.assertFalse((fragments / "z-last.md").exists())
+            self.assertEqual("keep", unrelated.read_text(encoding="utf-8"))
+
+            (fragments / "again.md").write_text(
+                "## Fixed\n- A fix.\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(changelog.ChangelogError):
+                changelog.fold_changelog(
+                    fragments,
+                    changelog_path,
+                    version="v0.1.0",
+                    date="2026-09-21",
+                )
+            self.assertTrue((fragments / "again.md").exists())
 
     def test_valid_high_risk_route(self) -> None:
         self.assertEqual([], self.findings("valid-high.json"))
@@ -426,6 +539,19 @@ class ValidatorConformanceTests(unittest.TestCase):
                 "repository policy",
             ),
         )
+        for schema_path in self.contract_root.glob("*.schema.json"):
+            schema = validator.json.loads(schema_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                "https://raw.githubusercontent.com/haesol-shin/.github/v0.1.0/"
+                f"contracts/v0.1.0/{schema_path.name}",
+                schema["$id"],
+            )
+        workflow = (ROOT / ".github" / "workflows" / "repository-policy.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Repository policy / ${{ matrix.name }}", workflow)
+        self.assertIn("check: contract", workflow)
+        self.assertIn("check: merge-approval", workflow)
 
     def test_record_rejects_noncanonical_spacing(self) -> None:
         record, error = validator.parse_record_line(

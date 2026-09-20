@@ -4,6 +4,7 @@ import argparse
 import base64
 from collections.abc import Iterator
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -28,7 +29,202 @@ RECORD_ORDERS = {
     for record, definition in CONTRACT["records"].items()
 }
 AUTHORITY_LINKS = CONTRACT["pull_request"].get("authority_links", {})
+
+CHANGELOG_DECLARATION_PATTERN = re.compile(
+    r"^- Changelog: (?P<kind>required|not-required|release) — (?P<value>\S.*\S|\S)$"
+)
+CHANGELOG_VERSION_PATTERN = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
+FRAGMENT_FILENAME_PATTERN = re.compile(
+    r"^(?P<issue>[1-9][0-9]*|direct)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
+)
+
+
+def parse_changelog_declaration(body: str) -> tuple[dict[str, str] | None, list[str]]:
+    candidates = [
+        line.strip()
+        for line in markdown_block_lines(body)
+        if line.strip().startswith("- Changelog:")
+    ]
+    errors: list[str] = []
+    declarations: list[dict[str, str]] = []
+    for line in candidates:
+        match = CHANGELOG_DECLARATION_PATTERN.fullmatch(line)
+        if not match:
+            errors.append(
+                "pull request changelog declaration must use "
+                "`- Changelog: required|not-required|release — <value>`"
+            )
+            continue
+        kind = match.group("kind")
+        value = match.group("value").strip()
+        if kind == "release":
+            if not CHANGELOG_VERSION_PATTERN.fullmatch(value):
+                errors.append("release changelog declaration must name a vX.Y.Z version")
+                continue
+        elif value.startswith("<") and value.endswith(">"):
+            errors.append("changelog declaration rationale must be non-placeholder text")
+            continue
+        declarations.append({"kind": kind, "value": value})
+    if len(candidates) == 0:
+        errors.append("pull request body must contain exactly one changelog declaration")
+    elif len(candidates) > 1:
+        errors.append("pull request body must contain exactly one changelog declaration")
+    if errors or len(declarations) != 1:
+        return None, errors
+    return declarations[0], []
+
+
+def _changelog_helpers() -> Any:
+    try:
+        from changelog import parse_fragment
+    except ModuleNotFoundError:
+        path = Path(__file__).with_name("changelog.py")
+        spec = importlib.util.spec_from_file_location("repo_ops_changelog", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("repository changelog helper is unavailable")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        parse_fragment = module.parse_fragment
+    return parse_fragment
+
+
+def _state_files(state: dict[str, Any]) -> list[dict[str, Any]]:
+    pull_request = state.get("pull_request") or {}
+    files = state.get("files", pull_request.get("files", []))
+    return [entry for entry in files if isinstance(entry, dict) and isinstance(entry.get("filename"), str)]
+
+
+def _fragment_path(filename: str, root: str) -> bool:
+    normalized = filename.replace("\\", "/")
+    prefix = root.strip("/").replace("\\", "/") + "/"
+    relative = normalized[len(prefix) :] if normalized.startswith(prefix) else None
+    return (
+        relative is not None
+        and "/" not in relative
+        and relative.endswith(".md")
+        and relative != "README.md"
+    )
+
+
+def _fragment_name_valid(filename: str, root: str) -> bool:
+    if not _fragment_path(filename, root):
+        return False
+    return FRAGMENT_FILENAME_PATTERN.fullmatch(filename.rsplit("/", 1)[-1]) is not None
+
+
+def _fragment_content(state: dict[str, Any], entry: dict[str, Any]) -> str | None:
+    filename = entry["filename"]
+    for key in ("file_contents", "fragment_contents"):
+        contents = state.get(key)
+        if isinstance(contents, dict) and isinstance(contents.get(filename), str):
+            return contents[filename]
+    if isinstance(entry.get("content"), str):
+        return entry["content"]
+    return None
+
+
+def validate_changelog_state(
+    state: dict[str, Any],
+    *,
+    policy: dict[str, Any],
+    issue: int | None,
+    direct: bool,
+    declaration: dict[str, str] | None,
+) -> list[str]:
+    errors: list[str] = []
+    files = _state_files(state)
+    changelog_policy = policy.get("changelog") or {}
+    mode = changelog_policy.get("mode")
+    root = changelog_policy.get("root")
+    if mode != "fragments":
+        root = None
+
+    if declaration is None:
+        return errors
+    kind = declaration["kind"]
+    if kind in {"required", "release"} and mode != "fragments":
+        errors.append("changelog fragments are required but repository policy does not enable fragments")
+        return errors
+    if kind == "release" and not (policy.get("release") or {}).get("enabled", False):
+        errors.append("release changelog declarations require release folding to be enabled")
+    if not root:
+        root = "changelog.d"
+
+    fragment_entries = [entry for entry in files if _fragment_path(entry["filename"], root)]
+    changed_fragments = [
+        entry
+        for entry in fragment_entries
+        if str(entry.get("status", "")).lower() in {"added", "modified"}
+    ]
+    deleted_fragments = [
+        entry
+        for entry in fragment_entries
+        if str(entry.get("status", "")).lower() == "removed"
+    ]
+    direct_changelog = [
+        entry
+        for entry in files
+        if entry["filename"].replace("\\", "/") == "CHANGELOG.md"
+    ]
+    release_changelog = [
+        entry
+        for entry in direct_changelog
+        if str(entry.get("status", "")).lower() in {"added", "modified"}
+    ]
+
+    if kind != "release" and direct_changelog:
+        errors.append("ordinary pull requests must not edit CHANGELOG.md")
+    if kind != "release" and deleted_fragments:
+        errors.append("fragment deletion is reserved for release changelog declarations")
+    if kind == "required" and not changed_fragments:
+        errors.append("required changelog declarations need an added or modified fragment")
+    if kind == "release":
+        if not release_changelog:
+            errors.append("release changelog declarations must update CHANGELOG.md")
+        if not deleted_fragments:
+            errors.append("release changelog declarations must consume at least one fragment")
+        if changed_fragments:
+            errors.append("release changelog declarations must consume, not modify, fragments")
+
+    for entry in [*changed_fragments, *deleted_fragments]:
+        filename = entry["filename"]
+        filename_match = FRAGMENT_FILENAME_PATTERN.fullmatch(filename.rsplit("/", 1)[-1])
+        if kind != "release":
+            if filename_match is None:
+                errors.append("fragment filename must use <issue>-<slug>.md or direct-<slug>.md")
+            elif direct:
+                if not filename_match.group("issue") == "direct":
+                    errors.append("direct low-risk fragments must use direct-<slug>.md")
+            elif issue is None:
+                errors.append("issue-backed fragments require a linked issue")
+            elif filename_match.group("issue") != str(issue):
+                errors.append("issue-backed fragment filename must begin with the linked issue number")
+        elif not _fragment_name_valid(filename, root):
+            errors.append("release fragment consumption includes an invalid fragment filename")
+    for entry in changed_fragments:
+        content = _fragment_content(state, entry)
+        if content is None:
+            errors.append(f"fragment content is unavailable for {entry['filename']}")
+            continue
+        try:
+            parse_fragment(content, filename=entry["filename"])
+        except ValueError as error:
+            errors.append(str(error))
+    return errors
 AUTHORIZED_ASSOCIATIONS = {"OWNER", "MEMBER"}
+RISK_AUTHORITY = CONTRACT.get(
+    "risk_authority",
+    {
+        "low": {"approval_associations": []},
+        "medium": {"approval_associations": ["MAINTAINER", "ADMIN", "OWNER"]},
+        "high": {"approval_associations": ["OWNER"]},
+    },
+)
+PLAN_APPROVAL_ASSOCIATIONS = {
+    association
+    for definition in RISK_AUTHORITY.values()
+    for association in definition.get("approval_associations", [])
+}
 
 
 def normalize_text(value: str) -> str:
@@ -229,9 +425,8 @@ def parse_plan_path(body: str) -> str | None:
         if not blob_match:
             return None
         value = blob_match.group(1)
-    if value.startswith("./"):
-        value = value[2:]
     return value if value.startswith(".ops/plans/") else None
+
 
 
 def parse_intent(
@@ -304,10 +499,7 @@ def parse_intent(
             "outcome": outcome,
         }, None
 
-    has_legacy_marker = bool(
-        re.search(r"(?m)^Intent accepted\.\s*$", unfenced)
-        or re.search(r"(?m)^Intent digest:", unfenced)
-    )
+    has_legacy_marker = bool(re.search(r"(?m)^Intent accepted\.\s*$", unfenced))
     if not has_legacy_marker:
         return None, None
     match = re.fullmatch(
@@ -362,7 +554,12 @@ def latest_record(
     return parsed, entry, errors
 
 
-def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
+def validate_state(
+    state: dict[str, Any],
+    contract_root: Path,
+    *,
+    check: str = "all",
+) -> list[str]:
     errors: list[str] = []
     policy = state.get("policy")
     if not isinstance(policy, dict):
@@ -409,6 +606,17 @@ def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
             errors.append("issue authority requires a linked issue")
         elif authority_links[0]["issue"] != issue:
             errors.append("issue authority does not match the linked issue")
+    declaration, declaration_errors = parse_changelog_declaration(body)
+    errors.extend(declaration_errors)
+    errors.extend(
+        validate_changelog_state(
+            state,
+            policy=policy,
+            issue=issue,
+            direct=direct,
+            declaration=declaration,
+        )
+    )
     comments = state.get("comments") or []
     if issue is not None:
         issue_body = state.get("issue_body") or ""
@@ -471,66 +679,19 @@ def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
     if risk == "low" and expected_plan != "none":
         errors.append("low-risk direct work must not claim a plan digest")
 
-    receipt, receipt_entry, receipt_errors = latest_record(records, "repo-ops.merge-review.v1")
-    errors.extend(receipt_errors)
-    if receipt is None:
-        errors.append("no merge-ready receipt was found")
-    else:
-        errors.extend(
-            validate_schema(
-                receipt,
-                contract_root / "merge-review.schema.json",
-                "merge-review receipt",
-            )
-        )
-        expected = {
-            "risk": risk,
-            "intent": expected_intent,
-            "plan": expected_plan,
-            "base": pull_request.get("merge_base"),
-            "head": pull_request.get("head"),
-            "diff": pull_request.get("diff_digest"),
-        }
-        for key, value in expected.items():
-            if value is not None and receipt.get(key) != value:
-                errors.append(f"merge-review {key} does not match the current pull request")
-
-        plan_round, plan_max = parse_round(receipt.get("plan-round", ""), allow_none=True)
-        implementation_round, implementation_max = parse_round(
-            receipt.get("implementation-round", ""),
-            allow_none=False,
-        )
-        limits = ROUND_LIMITS[risk]
-        if limits["plan"] is None:
-            if (plan_round, plan_max) != (None, None):
-                errors.append("low-risk merge review must use plan-round:none")
-        elif plan_max != limits["plan"] or plan_round is None or plan_round > plan_max:
-            errors.append(f"{risk}-risk plan round must be n/{limits['plan']}")
-        if (
-            implementation_max != limits["implementation"]
-            or implementation_round is None
-            or implementation_round > implementation_max
-        ):
-            errors.append(
-                f"{risk}-risk implementation round must be n/{limits['implementation']}"
-            )
-
-        if receipt_entry and receipt_entry.get("association") not in AUTHORIZED_ASSOCIATIONS:
-            errors.append("merge review was not posted by an authorized maintainer")
-        if policy.get("review", {}).get("shared_identity") is False:
-            if receipt_entry and receipt_entry.get("surface") != "review":
-                errors.append("independent review receipt must be submitted as a native GitHub Review")
-            if receipt_entry and receipt_entry.get("author") == pull_request.get("author"):
-                errors.append("independent review requires an identity distinct from the pull request author")
-
-    if risk == "high":
+    plan_comments = [
+        entry
+        for entry in comments
+        if entry.get("association") in PLAN_APPROVAL_ASSOCIATIONS
+    ]
+    if risk in {"medium", "high"}:
         approval, approval_entry, approval_errors = latest_record(
-            authorized_comments,
+            plan_comments,
             "repo-ops.plan-approval.v1",
         )
         errors.extend(approval_errors)
         if approval is None:
-            errors.append("high-risk work requires a maintainer plan approval")
+            errors.append(f"{risk}-risk work requires a maintainer plan approval")
         else:
             errors.extend(
                 validate_schema(
@@ -547,18 +708,74 @@ def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
             for key, value in expected_approval.items():
                 if value is not None and approval.get(key) != value:
                     errors.append(f"plan approval {key} does not match current work")
-            if approval_entry and approval_entry.get("association") not in AUTHORIZED_ASSOCIATIONS:
-                errors.append("plan approval was not posted by an authorized maintainer")
+            required_associations = set(
+                RISK_AUTHORITY.get(risk, {}).get("approval_associations", [])
+            )
+            if approval_entry and approval_entry.get("association") not in required_associations:
+                errors.append(f"{risk}-risk plan approval was not posted by an authorized maintainer")
             if approval.get("plan-commit") not in (state.get("plan_commits") or []):
                 errors.append("approved plan commit is not in the pull request history")
 
-    quality = state.get("quality") or {}
-    expected_quality_name = policy.get("quality", {}).get("check")
-    if receipt is not None and (
-        quality.get("name") != expected_quality_name
-        or quality.get("conclusion") != "success"
-    ):
-        errors.append(f"{expected_quality_name} has not succeeded for the current head")
+    if check != "contract":
+        receipt, receipt_entry, receipt_errors = latest_record(records, "repo-ops.merge-review.v1")
+        errors.extend(receipt_errors)
+        if receipt is None:
+            errors.append("no merge-ready receipt was found")
+        else:
+            errors.extend(
+                validate_schema(
+                    receipt,
+                    contract_root / "merge-review.schema.json",
+                    "merge-review receipt",
+                )
+            )
+            expected = {
+                "risk": risk,
+                "intent": expected_intent,
+                "plan": expected_plan,
+                "base": pull_request.get("merge_base"),
+                "head": pull_request.get("head"),
+                "diff": pull_request.get("diff_digest"),
+            }
+            for key, value in expected.items():
+                if value is not None and receipt.get(key) != value:
+                    errors.append(f"merge-review {key} does not match the current pull request")
+
+            plan_round, plan_max = parse_round(receipt.get("plan-round", ""), allow_none=True)
+            implementation_round, implementation_max = parse_round(
+                receipt.get("implementation-round", ""),
+                allow_none=False,
+            )
+            limits = ROUND_LIMITS[risk]
+            if limits["plan"] is None:
+                if (plan_round, plan_max) != (None, None):
+                    errors.append("low-risk merge review must use plan-round:none")
+            elif plan_max != limits["plan"] or plan_round is None or plan_round > plan_max:
+                errors.append(f"{risk}-risk plan round must be n/{limits['plan']}")
+            if (
+                implementation_max != limits["implementation"]
+                or implementation_round is None
+                or implementation_round > implementation_max
+            ):
+                errors.append(
+                    f"{risk}-risk implementation round must be n/{limits['implementation']}"
+                )
+
+            if receipt_entry and receipt_entry.get("association") not in AUTHORIZED_ASSOCIATIONS:
+                errors.append("merge review was not posted by an authorized maintainer")
+            if policy.get("review", {}).get("shared_identity") is False:
+                if receipt_entry and receipt_entry.get("surface") != "review":
+                    errors.append("independent review receipt must be submitted as a native GitHub Review")
+                if receipt_entry and receipt_entry.get("author") == pull_request.get("author"):
+                    errors.append("independent review requires an identity distinct from the pull request author")
+
+        quality = state.get("quality") or {}
+        expected_quality_name = policy.get("quality", {}).get("check")
+        if receipt is not None and (
+            quality.get("name") != expected_quality_name
+            or quality.get("conclusion") != "success"
+        ):
+            errors.append(f"{expected_quality_name} has not succeeded for the current head")
 
     return errors
 
@@ -737,6 +954,33 @@ def build_live_state(event_path: Path) -> dict[str, Any]:
     body = pull_request.get("body") or ""
     policy_text = api_content(client, repository, ".github/repo-policy.yml", base_sha)
     policy = yaml.safe_load(policy_text)
+    file_items = client.get_all(
+        f"/repos/{repository}/pulls/{number}/files?per_page=100"
+    )
+    files = [
+        {
+            "filename": item.get("filename"),
+            "status": item.get("status"),
+            "additions": item.get("additions"),
+            "deletions": item.get("deletions"),
+            "changes": item.get("changes"),
+        }
+        for item in file_items
+        if isinstance(item.get("filename"), str)
+    ]
+    fragment_contents: dict[str, str] = {}
+    fragment_root = (policy or {}).get("changelog", {}).get("root", "changelog.d")
+    for entry in files:
+        if (
+            str(entry.get("status", "")).lower() in {"added", "modified"}
+            and _fragment_path(entry["filename"], fragment_root)
+        ):
+            fragment_contents[entry["filename"]] = api_content(
+                client,
+                repository,
+                entry["filename"],
+                pull_request["head"]["sha"],
+            )
     comparison = client.get(
         f"/repos/{repository}/compare/{base_sha}...{pull_request['head']['sha']}"
     )
@@ -781,7 +1025,7 @@ def build_live_state(event_path: Path) -> dict[str, Any]:
     for comment in (
         entry
         for entry in pr_comments
-        if entry.get("association") in AUTHORIZED_ASSOCIATIONS
+        if entry.get("association") in PLAN_APPROVAL_ASSOCIATIONS
     ):
         approval, _ = parse_record_line(comment["body"], "repo-ops.plan-approval.v1")
         if not approval:
@@ -824,7 +1068,10 @@ def build_live_state(event_path: Path) -> dict[str, Any]:
             "merge_base": merge_base,
             "head": pull_request["head"]["sha"],
             "diff_digest": diff_digest,
+            "files": files,
         },
+        "files": files,
+        "file_contents": fragment_contents,
         "issue": issue_number,
         "issue_body": issue_body,
         "intent_comments": intent_comments,
@@ -856,29 +1103,34 @@ def load_fixture(path: Path) -> tuple[dict[str, Any], str | None]:
     return state, document.get("expected")
 
 
-def emit_findings(findings: list[str], mode: str) -> None:
+def emit_findings(findings: list[str], check: str) -> None:
     if findings:
         for finding in findings:
             print(f"::warning title=Repository policy::{finding}")
         summary = os.environ.get("GITHUB_STEP_SUMMARY")
         if summary:
             with open(summary, "a", encoding="utf-8") as stream:
-                stream.write("## Repository policy findings\n\n")
+                stream.write(f"## Repository policy / {check} findings\n\n")
                 for finding in findings:
                     stream.write(f"- {finding}\n")
-        print(f"Repository policy: {len(findings)} finding(s) in {mode} mode")
+        print(f"Repository policy / {check}: {len(findings)} finding(s)")
     else:
-        print("Repository policy: contract satisfied")
+        print(f"Repository policy / {check}: contract satisfied")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--event", type=Path)
-    source.add_argument("--fixture", type=Path)
-    parser.add_argument("--mode", choices=("advisory", "enforce"), default="advisory")
-    args = parser.parse_args()
+    parser.add_argument("--event", type=Path)
+    parser.add_argument("--fixture", type=Path)
+    parser.add_argument(
+        "--check",
+        choices=("all", "contract", "merge-approval"),
+        default="all",
+    )
 
+    args = parser.parse_args()
+    if bool(args.fixture) == bool(args.event):
+        parser.error("exactly one of --fixture or --event is required")
     repository_root = Path(__file__).resolve().parents[2]
     contract_root = repository_root / "contracts" / "v0.1.0"
     try:
@@ -886,12 +1138,18 @@ def main() -> int:
             state, _ = load_fixture(args.fixture)
         else:
             state = build_live_state(args.event)
-        findings = validate_state(state, contract_root)
+        if args.check == "merge-approval":
+            contract_findings = validate_state(state, contract_root, check="contract")
+            findings = validate_state(state, contract_root, check="merge-approval")
+            if contract_findings:
+                findings.insert(0, "contract check did not succeed; merge approval is blocked")
+        else:
+            findings = validate_state(state, contract_root, check=args.check)
     except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
         findings = [str(error)]
 
-    emit_findings(findings, args.mode)
-    return 1 if findings and args.mode == "enforce" else 0
+    emit_findings(findings, args.check)
+    return 1 if findings else 0
 
 
 if __name__ == "__main__":

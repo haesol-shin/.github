@@ -21,4 +21,3 @@ jobs:
       pull-requests: read
     with:
       contract-ref: ${{ github.event.pull_request.base.sha || github.sha }}
-      mode: advisory

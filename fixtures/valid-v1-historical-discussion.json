@@ -1,0 +1,23 @@
+{
+  "extends": "valid-v1-related.json",
+  "replace": {
+    "intent_comments": [
+      {
+        "author": "maintainer",
+        "association": "OWNER",
+        "body": "Intent accepted.\n\nAdd a trusted validator without executing pull request code.\n\nRisk: high\nIntent digest: sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871\n"
+      },
+      {
+        "author": "maintainer",
+        "association": "OWNER",
+        "body": "**Intent accepted**\n\nAdd a trusted validator without executing pull request code.\n\n- Risk: `high`\n- Intent digest: `sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc`\n- Supersedes: `sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871`\n\nAuthoritative machine-readable record:\n\n```text\nrepo-ops.intent.v1 decision:accepted risk:high intent:sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc supersedes:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871\n```\n"
+      },
+      {
+        "author": "maintainer",
+        "association": "OWNER",
+        "body": "Design discussion only.\n\nIntent digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+      }
+    ]
+  },
+  "expected": null
+}

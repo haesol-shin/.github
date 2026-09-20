@@ -1,0 +1,110 @@
+{
+  "contract": "repo-ops/v0.1.0",
+  "description": "Language-independent changelog declaration and fragment lifecycle cases",
+  "cases": [
+    {
+      "name": "required-owned-fragment",
+      "input": {
+        "route": "Related #3",
+        "declaration": "- Changelog: required — users need the release note",
+        "files": [
+          {
+            "filename": "changelog.d/3-repo-ops-v0.1.0.md",
+            "status": "added",
+            "content": "## Added\n- Publish the contract.\n"
+          }
+        ]
+      },
+      "expected": {
+        "valid": true,
+        "findings": []
+      }
+    },
+    {
+      "name": "required-missing-fragment",
+      "input": {
+        "route": "Related #3",
+        "declaration": "- Changelog: required — users need the release note",
+        "files": []
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["required changelog declarations need an added or modified fragment"]
+      }
+    },
+    {
+      "name": "issue-ownership-mismatch",
+      "input": {
+        "route": "Related #3",
+        "declaration": "- Changelog: required — users need the release note",
+        "files": [
+          {
+            "filename": "changelog.d/4-other.md",
+            "status": "added",
+            "content": "## Changed\n- Change another issue.\n"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["issue-backed fragment filename must begin with the linked issue number"]
+      }
+    },
+    {
+      "name": "ordinary-direct-changelog-edit",
+      "input": {
+        "route": "Related #3",
+        "declaration": "- Changelog: not-required — no release note is needed",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["ordinary pull requests must not edit CHANGELOG.md"]
+      }
+    },
+    {
+      "name": "malformed-fragment-section",
+      "input": {
+        "route": "Related #3",
+        "declaration": "- Changelog: required — users need the release note",
+        "files": [
+          {
+            "filename": "changelog.d/3-bad.md",
+            "status": "added",
+            "content": "## Notes\n- Unsupported section.\n"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["content must follow an allowed section heading"]
+      }
+    },
+    {
+      "name": "release-consumes-fragments",
+      "input": {
+        "route": "Related #3",
+        "declaration": "- Changelog: release — v0.1.0",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          },
+          {
+            "filename": "changelog.d/3-repo-ops-v0.1.0.md",
+            "status": "removed"
+          }
+        ]
+      },
+      "expected": {
+        "valid": true,
+        "findings": []
+      }
+    }
+  ]
+}

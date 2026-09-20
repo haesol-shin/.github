@@ -1,0 +1,7 @@
+{
+  "extends": "valid-v1-related.json",
+  "replace": {
+    "pull_request.body": "## Summary\n\nAdd the trusted repository policy validator.\n\n## Changes\n\n- Validate immutable approval and review receipts.\n\n## Impact\n\n- User/runtime: policy failures become visible before merge\n- API/schema/dependencies: adds the repository policy contract\n- Operations/deployment: no production deployment\n- Not changed: pull request heads remain untrusted input\n- Changelog: required — users and operators need this release note\n\n## Verification\n\n- Conformance fixtures — local runner — passed\n- Unverified: none\n\n## Risk and rollback\n\nRisk: high — changes repository policy enforcement\n\nRollback: revert the pull request\n\n## Related\n\nRelated #42\nPlan: .ops/plans/42-policy-validator.md\n"
+  },
+  "expected": "required changelog declarations need an added or modified fragment"
+}

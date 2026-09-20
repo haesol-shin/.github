@@ -7,18 +7,21 @@ on:
         description: Immutable commit SHA containing the validator and schemas
         required: true
         type: string
-      mode:
-        description: advisory reports findings; enforce fails the check
-        required: false
-        default: advisory
-        type: string
 
 permissions: {}
 
 jobs:
-  contract:
-    name: Repository policy / contract
+  policy:
+    name: Repository policy / ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: contract
+            check: contract
+          - name: merge approval
+            check: merge-approval
     permissions:
       checks: read
       contents: read
@@ -47,4 +50,4 @@ jobs:
       - name: Validate repository contract
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --mode "${{ inputs.mode }}"
+        run: uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --check "${{ matrix.check }}"
