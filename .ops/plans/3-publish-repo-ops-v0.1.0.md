@@ -25,7 +25,7 @@ repo-ops.intent.v1 decision:accepted risk:high intent:sha256:<digest> supersedes
 ```
 ````
 
-The human display omits redundant Issue and Decision fields. The trusted validator derives the Issue number from the GitHub comment surface and computes the intent digest from canonical `{issue, outcome, risk}`. The first v1 record uses `supersedes:none`; a replacement must name the current digest. Displayed values must match the fenced record. Intermediate design comments are not intent records.
+The human display omits redundant Issue and Decision fields. The trusted validator derives the Issue number from the GitHub comment surface and computes the intent digest from canonical `{issue, outcome, risk}`. When no legacy record exists, the first v1 record uses `supersedes:none`. A legacy-to-v1 migration instead names the current legacy digest, and every later replacement names the current v1 digest. Displayed values must match the fenced record. Intermediate design comments are not intent records.
 
 The bootstrap preserves audit continuity from the legacy accepted-intent format. Before the bootstrap pull request, one final legacy record is computed from the same stabilized outcome and current `{outcome, risk}` algorithm. After the new validator reaches `main`, the first v1 record uses the issue-bound digest and names the legacy digest in `supersedes`. Later replacements form one validated chain.
 
