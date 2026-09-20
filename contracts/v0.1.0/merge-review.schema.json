@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/haesol-shin/.github/blob/v0.1.0/contracts/v0.1.0/merge-review.schema.json",
+  "title": "Exact-head merge review receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record", "verdict", "risk", "intent", "plan", "plan-round", "implementation-round", "base", "head", "diff", "runtime", "model"],
+  "properties": {
+    "record": {
+      "const": "repo-ops.merge-review.v1"
+    },
+    "verdict": {
+      "const": "merge-ready"
+    },
+    "risk": {
+      "enum": ["low", "medium", "high"]
+    },
+    "intent": {
+      "type": "string",
+      "pattern": "^(sha256:[0-9a-f]{64}|none)$"
+    },
+    "plan": {
+      "type": "string",
+      "pattern": "^(sha256:[0-9a-f]{64}|none)$"
+    },
+    "plan-round": {
+      "type": "string",
+      "pattern": "^(none|[1-9][0-9]*/[1-9][0-9]*)$"
+    },
+    "implementation-round": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"
+    },
+    "base": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "diff": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runtime": {
+      "type": "string",
+      "pattern": "^[^\\s]+$"
+    },
+    "model": {
+      "type": "string",
+      "pattern": "^[^\\s]+$"
+    }
+  }
+}

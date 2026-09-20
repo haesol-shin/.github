@@ -1,0 +1,21 @@
+name: Repository policy contract
+description: Validate repository policy, approvals, and exact-head merge receipts without executing pull request code
+inputs:
+  github-token:
+    description: Read-only token used to inspect pull request metadata and base-owned policy
+    required: true
+  mode:
+    description: advisory reports findings without failing; enforce fails on findings
+    required: false
+    default: advisory
+runs:
+  using: composite
+  steps:
+    - name: Install pinned validator dependencies
+      shell: bash
+      run: python3 -m pip install --disable-pip-version-check -r "${{ github.action_path }}/requirements.txt"
+    - name: Validate repository contract
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs['github-token'] }}
+      run: python3 "${{ github.action_path }}/validate.py" --event "$GITHUB_EVENT_PATH" --mode "${{ inputs.mode }}"

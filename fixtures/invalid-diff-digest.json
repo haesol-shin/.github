@@ -1,0 +1,7 @@
+{
+  "extends": "valid-low-direct.json",
+  "replace": {
+    "comments.0.body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:low intent:none plan:none plan-round:none implementation-round:1/2 base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff runtime:omp/0.1 model:provider/model"
+  },
+  "expected": "merge-review diff does not match the current pull request"
+}

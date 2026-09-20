@@ -1,0 +1,12 @@
+contract: repo-ops/v0.1.0
+profile: operations
+quality:
+  check: CI / quality
+  commands:
+    - python -m unittest discover -s tests -v
+review:
+  shared_identity: true
+changelog:
+  mode: none
+release:
+  enabled: false

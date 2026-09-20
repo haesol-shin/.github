@@ -1,0 +1,34 @@
+{
+  "id": "repo-ops/v0.1.0",
+  "issue": {
+    "required_headings": ["## Problem", "## Desired outcome"]
+  },
+  "pull_request": {
+    "required_headings": ["## Summary", "## Changes", "## Verification", "## Related"]
+  },
+  "round_limits": {
+    "low": {
+      "plan": null,
+      "implementation": 2
+    },
+    "medium": {
+      "plan": 3,
+      "implementation": 3
+    },
+    "high": {
+      "plan": 5,
+      "implementation": 5
+    }
+  },
+  "records": {
+    "repo-ops.plan-approval.v1": {
+      "schema": "plan-approval.schema.json",
+      "field_order": ["decision", "risk", "issue", "intent", "plan", "plan-commit"]
+    },
+    "repo-ops.merge-review.v1": {
+      "schema": "merge-review.schema.json",
+      "field_order": ["verdict", "risk", "intent", "plan", "plan-round", "implementation-round", "base", "head", "diff", "runtime", "model"]
+    }
+  },
+  "repository_policy_schema": "repository-policy.schema.json"
+}

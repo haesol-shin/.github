@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/haesol-shin/.github/blob/v0.1.0/contracts/v0.1.0/repository-policy.schema.json",
+  "title": "Repository operations policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "profile", "quality", "review", "changelog", "release"],
+  "properties": {
+    "contract": {
+      "const": "repo-ops/v0.1.0"
+    },
+    "profile": {
+      "enum": ["python-engine", "campus-provider", "agent-plugin-or-catalog", "operations", "custom"]
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check", "commands"],
+      "properties": {
+        "check": {
+          "const": "CI / quality"
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shared_identity"],
+      "properties": {
+        "shared_identity": {
+          "type": "boolean"
+        }
+      }
+    },
+    "changelog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["fragments", "append-only", "none"]
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "fragments"
+              }
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "required": ["root"]
+          }
+        }
+      ]
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+name: Repository policy contract
+
+on:
+  workflow_call:
+    inputs:
+      contract-ref:
+        description: Immutable commit SHA containing the validator and schemas
+        required: true
+        type: string
+      mode:
+        description: advisory reports findings; enforce fails the check
+        required: false
+        default: advisory
+        type: string
+
+permissions: {}
+
+jobs:
+  contract:
+    name: Repository policy / contract
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Validate immutable contract reference
+        env:
+          CONTRACT_REF: ${{ inputs['contract-ref'] }}
+        run: |
+          [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "contract-ref must be a full commit SHA" >&2
+            exit 1
+          }
+      - name: Fetch trusted validator
+        env:
+          CONTRACT_REF: ${{ inputs['contract-ref'] }}
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
+          git -C .repo-ops checkout --detach "$CONTRACT_REF"
+      - name: Install pinned validator dependencies
+        run: python3 -m pip install --disable-pip-version-check -r .repo-ops/actions/repository-policy/requirements.txt
+      - name: Validate repository contract
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --mode "${{ inputs.mode }}"

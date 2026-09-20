@@ -1,0 +1,24 @@
+name: Repository policy
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  issue_comment:
+    types: [created, edited, deleted]
+
+permissions: {}
+
+jobs:
+  contract:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    uses: ./.github/workflows/repository-policy.yml
+    permissions:
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+    with:
+      contract-ref: ${{ github.event.pull_request.base.sha || github.sha }}
+      mode: advisory

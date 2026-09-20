@@ -1,0 +1,55 @@
+{
+  "policy": {
+    "contract": "repo-ops/v0.1.0",
+    "profile": "operations",
+    "quality": {
+      "check": "CI / quality",
+      "commands": ["python -m unittest discover -s tests -v"]
+    },
+    "review": {
+      "shared_identity": true
+    },
+    "changelog": {
+      "mode": "none"
+    },
+    "release": {
+      "enabled": false
+    }
+  },
+  "pull_request": {
+    "number": 9,
+    "author": "maintainer",
+    "body": "## Summary\n\nAdd the trusted repository policy validator.\n\n## Changes\n\n- Validate immutable approval and review receipts.\n\n## Verification\n\n- Conformance fixtures — local runner — passed\n- Unverified: none\n\nRisk: high — changes repository policy enforcement\nRollback: revert the pull request\n\n## Related\n\nFixes #42\nPlan: .ops/plans/42-policy-validator.md\n",
+    "merge_base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "diff_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "issue": 42,
+  "issue_body": "## Problem\n\nRepository approvals are not machine-validated.\n\n## Desired outcome\n\nTrusted validation rejects stale or malformed evidence.\n",
+  "intent_comments": [
+    {
+      "author": "maintainer",
+      "association": "OWNER",
+      "body": "Intent accepted.\n\nAdd a trusted validator without executing pull request code.\n\nRisk: high\nIntent digest: sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871"
+    }
+  ],
+  "comments": [
+    {
+      "author": "maintainer",
+      "association": "OWNER",
+      "body": "repo-ops.plan-approval.v1 decision:approved risk:high issue:42 intent:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871 plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-commit:dddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "author": "maintainer",
+      "association": "OWNER",
+      "body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:high intent:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871 plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-round:1/5 implementation-round:1/5 base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc runtime:omp/0.1 model:provider/model"
+    }
+  ],
+  "reviews": [],
+  "plan_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "plan_commits": ["dddddddddddddddddddddddddddddddddddddddd"],
+  "quality": {
+    "name": "CI / quality",
+    "conclusion": "success"
+  }
+}

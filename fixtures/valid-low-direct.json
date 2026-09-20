@@ -1,0 +1,43 @@
+{
+  "policy": {
+    "contract": "repo-ops/v0.1.0",
+    "profile": "operations",
+    "quality": {
+      "check": "CI / quality",
+      "commands": ["python -m unittest discover -s tests -v"]
+    },
+    "review": {
+      "shared_identity": true
+    },
+    "changelog": {
+      "mode": "none"
+    },
+    "release": {
+      "enabled": false
+    }
+  },
+  "pull_request": {
+    "number": 7,
+    "author": "maintainer",
+    "body": "## Summary\n\nDocument the policy validator and its outcome.\n\n## Changes\n\n- Add the validator contract.\n\n## Verification\n\n- Fixture validation — local runner — passed\n- Unverified: none\n\nRisk: low — documentation and isolated policy code\nRollback: revert the pull request\n\n## Related\n\nDirect low-risk PR: maintainer-authorized policy documentation\nPlan: none\n",
+    "merge_base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "diff_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "issue": null,
+  "intent_comments": [],
+  "comments": [
+    {
+      "author": "maintainer",
+      "association": "OWNER",
+      "body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:low intent:none plan:none plan-round:none implementation-round:1/2 base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc runtime:omp/0.1 model:provider/model"
+    }
+  ],
+  "reviews": [],
+  "plan_digest": "none",
+  "plan_commits": [],
+  "quality": {
+    "name": "CI / quality",
+    "conclusion": "success"
+  }
+}

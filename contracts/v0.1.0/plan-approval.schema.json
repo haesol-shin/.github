@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/haesol-shin/.github/blob/v0.1.0/contracts/v0.1.0/plan-approval.schema.json",
+  "title": "High-risk plan approval receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record", "decision", "risk", "issue", "intent", "plan", "plan-commit"],
+  "properties": {
+    "record": {
+      "const": "repo-ops.plan-approval.v1"
+    },
+    "decision": {
+      "const": "approved"
+    },
+    "risk": {
+      "const": "high"
+    },
+    "issue": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "intent": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "plan": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "plan-commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    }
+  }
+}
