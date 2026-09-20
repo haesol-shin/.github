@@ -19,7 +19,7 @@
   "pull_request": {
     "number": 7,
     "author": "maintainer",
-    "body": "## Summary\n\nDocument the policy validator and its outcome.\n\n## Changes\n\n- Add the validator contract.\n\n## Verification\n\n- Fixture validation — local runner — passed\n- Unverified: none\n\nRisk: low — documentation and isolated policy code\nRollback: revert the pull request\n\n## Related\n\nDirect low-risk PR: maintainer-authorized policy documentation\nPlan: none\n",
+    "body": "## Summary\n\nDocument the policy validator and its outcome.\n\n## Changes\n\n- Add the validator contract.\n\n## Impact\n\n- User/runtime: policy behavior is documented\n- API/schema/dependencies: no runtime dependency change\n- Operations/deployment: none\n- Not changed: validator behavior\n\n## Verification\n\n- Fixture validation — local runner — passed\n- Unverified: none\n\n## Risk and rollback\n\nRisk: low — documentation and isolated policy code\n\nRollback: revert the pull request\n\n## Related\n\nDirect low-risk PR: maintainer-authorized policy documentation\nPlan: none\n",
     "merge_base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "diff_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
