@@ -13,9 +13,12 @@
     "required_heading_order": true,
     "required_headings": ["## Summary", "## Changes", "## Impact", "## Verification", "## Risk and rollback", "## Related"],
     "allow_additional_headings": true,
-    "authority_links": {
-      "keywords": ["Fixes", "Closes", "Related"],
-      "exactly_one": true
+    "changelog": {
+      "declaration_prefix": "- Changelog:",
+      "values": ["required", "not-required", "release"],
+      "required_rationale": true,
+      "release_version_pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "allowed_fragment_sections": ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
     }
   },
   "round_limits": {
@@ -30,6 +33,23 @@
     "high": {
       "plan": 5,
       "implementation": 5
+    }
+  },
+  "risk_authority": {
+    "low": {
+      "plan": "none",
+      "approval_associations": [],
+      "approval_permissions": []
+    },
+    "medium": {
+      "plan": "required",
+      "approval_associations": ["OWNER"],
+      "approval_permissions": ["maintain", "admin"]
+    },
+    "high": {
+      "plan": "required",
+      "approval_associations": ["OWNER"],
+      "approval_permissions": []
     }
   },
   "records": {

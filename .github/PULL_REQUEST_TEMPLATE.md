@@ -13,6 +13,10 @@ Describe the problem and impact, why this work was needed, and the delivered out
 - API/schema/dependencies: <effect | none>
 - Operations/deployment: <effect | none>
 - Not changed: <important preserved boundary | none>
+- Changelog: required — <why users or operators need a release note>
+- Changelog: not-required — <why no release note is needed>
+- Changelog: release — vX.Y.Z
+
 
 ## Verification
 

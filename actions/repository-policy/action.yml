@@ -4,10 +4,10 @@ inputs:
   github-token:
     description: Read-only token used to inspect pull request metadata and base-owned policy
     required: true
-  mode:
-    description: advisory reports findings without failing; enforce fails on findings
+  check:
+    description: Stable evaluator surface: contract or merge-approval
     required: false
-    default: advisory
+    default: merge-approval
 runs:
   using: composite
   steps:
@@ -20,4 +20,4 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs['github-token'] }}
-      run: uv run --project "${{ github.action_path }}" --locked python "${{ github.action_path }}/validate.py" --event "$GITHUB_EVENT_PATH" --mode "${{ inputs.mode }}"
+      run: uv run --project "${{ github.action_path }}" --locked python "${{ github.action_path }}/validate.py" --event "$GITHUB_EVENT_PATH" --check "${{ inputs.check }}"

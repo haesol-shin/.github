@@ -1,0 +1,15 @@
+{
+  "extends": "valid-required-fragment.json",
+  "replace": {
+    "files": [
+      {
+        "filename": "changelog.d/41-validator.md",
+        "status": "added"
+      }
+    ],
+    "file_contents": {
+      "changelog.d/41-validator.md": "## Changed\n- Validate the trusted policy contract.\n"
+    }
+  },
+  "expected": "issue-backed fragment filename must begin with the linked issue number"
+}

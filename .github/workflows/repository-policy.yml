@@ -7,20 +7,41 @@ on:
         description: Immutable commit SHA containing the validator and schemas
         required: true
         type: string
-      mode:
-        description: advisory reports findings; enforce fails the check
-        required: false
-        default: advisory
+      head-sha:
+        description: Exact pull request head SHA receiving policy check runs
+        required: true
         type: string
 
 permissions: {}
 
+
 jobs:
-  contract:
-    name: Repository policy / contract
+  revoke:
+    name: Revoke stale policy checks
     runs-on: ubuntu-latest
     permissions:
-      checks: read
+      checks: write
+    steps:
+      - name: Revoke prior exact-head results
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ inputs['head-sha'] }}
+        run: |
+          for check_name in "contract" "merge approval"; do
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+              -f "name=${check_name}" \
+              -f "head_sha=${HEAD_SHA}" \
+              -f "status=completed" \
+              -f "conclusion=failure" \
+              -f "output[title]=Validation pending" \
+              -f "output[summary]=Previous policy result revoked before candidate validation."
+          done
+  contract:
+    needs: revoke
+    name: contract
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
       contents: read
       issues: read
       pull-requests: read
@@ -44,7 +65,89 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: .repo-ops/actions/repository-policy/uv.lock
-      - name: Validate repository contract
+      - name: Validate and publish repository contract
+        id: validate
         env:
+          GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --mode "${{ inputs.mode }}"
+          HEAD_SHA: ${{ inputs['head-sha'] }}
+        run: |
+          set +e
+          uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --check contract
+          validator_result=$?
+          if [[ "$validator_result" == "0" ]]; then
+            conclusion=success
+          else
+            conclusion=failure
+          fi
+          if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f "name=contract" \
+            -f "head_sha=${HEAD_SHA}" \
+            -f "status=completed" \
+            -f "conclusion=${conclusion}" \
+            -f "output[title]=Contract evaluation" \
+            -f "output[summary]=Trusted base-owned contract evaluation completed."; then
+            exit 1
+          fi
+          exit "$validator_result"
+
+  merge-approval:
+    name: merge approval
+    needs: [revoke, contract]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Validate immutable contract reference
+        env:
+          CONTRACT_REF: ${{ inputs['contract-ref'] }}
+        run: |
+          [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "contract-ref must be a full commit SHA" >&2
+            exit 1
+          }
+      - name: Fetch trusted validator
+        env:
+          CONTRACT_REF: ${{ inputs['contract-ref'] }}
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
+          git -C .repo-ops checkout --detach "$CONTRACT_REF"
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+        with:
+          enable-cache: true
+          cache-dependency-glob: .repo-ops/actions/repository-policy/uv.lock
+      - name: Validate and publish merge approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ inputs['head-sha'] }}
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          REVOKE_RESULT: ${{ needs.revoke.result }}
+        run: |
+          set +e
+          uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --check merge-approval
+          validator_result=$?
+          if [[ "$CONTRACT_RESULT" != "success" || "$REVOKE_RESULT" != "success" ]]; then
+            echo "Repository policy / contract or revocation did not succeed; merge approval is blocked" >&2
+            validator_result=1
+          fi
+          if [[ "$validator_result" == "0" ]]; then
+            conclusion=success
+          else
+            conclusion=failure
+          fi
+          if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f "name=merge approval" \
+            -f "head_sha=${HEAD_SHA}" \
+            -f "status=completed" \
+            -f "conclusion=${conclusion}" \
+            -f "output[title]=Merge approval evaluation" \
+            -f "output[summary]=Trusted base-owned exact-head evaluation completed."; then
+            exit 1
+          fi
+          exit "$validator_result"

@@ -7,6 +7,7 @@ quality:
 review:
   shared_identity: true
 changelog:
-  mode: none
+  mode: fragments
+  root: changelog.d
 release:
-  enabled: false
+  enabled: true
