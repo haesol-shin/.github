@@ -14,10 +14,6 @@
     "required_headings": ["## Summary", "## Changes", "## Impact", "## Verification", "## Risk and rollback", "## Related"],
     "allow_additional_headings": true,
     "changelog": {
-      "declaration_prefix": "- Changelog:",
-      "values": ["required", "not-required", "release"],
-      "required_rationale": true,
-      "release_version_pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
       "allowed_fragment_sections": ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
     }
   },
@@ -40,6 +36,10 @@
     }
   },
   "records": {
+    "repo-ops.changelog.v1": {
+      "schema": "changelog-declaration.schema.json",
+      "field_order": ["kind", "value"]
+    },
     "repo-ops.plan-approval.v1": {
       "schema": "plan-approval.schema.json",
       "field_order": ["decision", "risk", "issue", "intent", "plan", "plan-commit"]

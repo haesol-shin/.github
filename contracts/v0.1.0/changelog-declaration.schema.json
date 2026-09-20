@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/haesol-shin/.github/v0.1.0/contracts/v0.1.0/changelog-declaration.schema.json",
+  "title": "Pull request changelog declaration record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record", "kind", "value"],
+  "properties": {
+    "record": {
+      "type": "string",
+      "const": "repo-ops.changelog.v1"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["required", "not-required", "release"]
+    },
+    "value": {
+      "type": "string"
+    }
+  },
+  "if": {
+    "properties": {
+      "kind": {
+        "const": "release"
+      }
+    },
+    "required": ["kind"]
+  },
+  "then": {
+    "properties": {
+      "value": {
+        "type": "string",
+        "pattern": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "value": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "not": {
+          "const": "replace-me"
+        }
+      }
+    }
+  }
+}

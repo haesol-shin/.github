@@ -13,9 +13,16 @@ Describe the problem and impact, why this work was needed, and the delivered out
 - API/schema/dependencies: <effect | none>
 - Operations/deployment: <effect | none>
 - Not changed: <important preserved boundary | none>
-- Changelog: required — <why users or operators need a release note>
-- Changelog: not-required — <why no release note is needed>
-- Changelog: release — vX.Y.Z
+Replace the next line with exactly one unfenced `repo-ops.changelog.v1` record. The placeholder fails until edited:
+
+repo-ops.changelog.v1 kind:not-required value:replace-me
+
+```text
+Replace the placeholder with exactly one of:
+repo-ops.changelog.v1 kind:required value:fragment-added
+repo-ops.changelog.v1 kind:not-required value:plan-only
+repo-ops.changelog.v1 kind:release value:v0.1.0
+```
 
 
 ## Verification

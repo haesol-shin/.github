@@ -28,6 +28,23 @@ CHANGELOG_SPEC.loader.exec_module(changelog)
 class ValidatorConformanceTests(unittest.TestCase):
     contract_root = ROOT / "contracts" / "v0.1.0"
     fixtures = ROOT / "fixtures"
+    _FIXTURE_CHANGELOG = (
+        "repo-ops.changelog.v1 kind:not-required value:receipt-validation"
+    )
+    _EXACTLY_ONE_CHANGELOG = (
+        "pull request body must contain exactly one repo-ops.changelog.v1 record"
+    )
+    _MALFORMED_CHANGELOG = "malformed repo-ops.changelog.v1 record"
+    _CHANGELOG_SCHEMA_LABEL = "changelog declaration"
+    _LIFECYCLE_FINDINGS = (
+        "required changelog declarations need an added or modified fragment",
+        "ordinary pull requests must not edit CHANGELOG.md",
+        "fragment deletion is reserved for release changelog declarations",
+        "release changelog declarations must update CHANGELOG.md",
+        "release changelog declarations must consume at least one fragment",
+        "release changelog declarations must consume, not modify, fragments",
+    )
+
 
     def findings(self, name: str) -> list[str]:
         state, _ = validator.load_fixture(self.fixtures / name)
@@ -65,6 +82,72 @@ class ValidatorConformanceTests(unittest.TestCase):
     def v1_state(self) -> dict:
         state, _ = validator.load_fixture(self.fixtures / "valid-v1-related.json")
         return state
+
+    def _with_changelog_line(
+        self,
+        line: str,
+        *,
+        files: list[dict] | None = None,
+        file_contents: dict[str, str] | None = None,
+        suffix: str = "",
+    ) -> dict:
+        state = self.v1_state()
+        body = state["pull_request"]["body"].replace(self._FIXTURE_CHANGELOG, line, 1)
+        if suffix:
+            body += suffix
+        state["pull_request"]["body"] = body
+        if files is not None:
+            state["files"] = files
+        if file_contents is not None:
+            state["file_contents"] = file_contents
+        return state
+
+    def _owned_fragment(self) -> tuple[list[dict], dict[str, str]]:
+        return (
+            [{"filename": "changelog.d/42-validator.md", "status": "added"}],
+            {
+                "changelog.d/42-validator.md": (
+                    "## Changed\n- Validate the trusted policy contract.\n"
+                )
+            },
+        )
+
+    def _assert_no_lifecycle(self, findings: list[str]) -> None:
+        joined = "\n".join(findings)
+        for needle in self._LIFECYCLE_FINDINGS:
+            self.assertNotIn(needle, joined)
+
+    def _changelog_corpus_findings(self, payload: dict) -> list[str]:
+        declaration, findings = validator.parse_changelog_declaration(payload["body"])
+        files: list[dict] = []
+        file_contents: dict[str, str] = {}
+        for entry in payload.get("files") or []:
+            files.append({"filename": entry["filename"], "status": entry["status"]})
+            content = entry.get("content")
+            if isinstance(content, str):
+                file_contents[entry["filename"]] = content
+        route = payload["route"]
+        direct = route.startswith("Direct")
+        issue = None
+        if "#" in route:
+            issue = int(route.rsplit("#", 1)[-1].split()[0])
+        if declaration is None:
+            return findings
+        findings = [
+            *findings,
+            *validator.validate_changelog_state(
+                {"files": files, "file_contents": file_contents},
+                policy={
+                    "changelog": {"mode": "fragments", "root": "changelog.d"},
+                    "release": {"enabled": True},
+                },
+                issue=issue,
+                direct=direct,
+                declaration=declaration,
+            ),
+        ]
+        return findings
+
 
     def test_valid_v1_related_route(self) -> None:
         self.assertEqual([], validator.validate_state(self.v1_state(), self.contract_root))
@@ -248,18 +331,12 @@ class ValidatorConformanceTests(unittest.TestCase):
         self.assertEqual([], self.findings("valid-v1-historical-discussion.json"))
 
     def test_changelog_declaration_requires_owned_valid_fragment(self) -> None:
-        state = self.v1_state()
-        state["pull_request"]["body"] = state["pull_request"]["body"].replace(
-            "Changelog: not-required — this fixture exercises receipt validation without a release-note change",
-            "Changelog: required — this change needs a release note",
-            1,
+        files, contents = self._owned_fragment()
+        state = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:required value:fragment-added",
+            files=files,
+            file_contents=contents,
         )
-        state["files"] = [
-            {"filename": "changelog.d/42-validator.md", "status": "added"},
-        ]
-        state["file_contents"] = {
-            "changelog.d/42-validator.md": "## Changed\n- Validate the trusted policy contract.\n"
-        }
         self.assertEqual([], validator.validate_state(state, self.contract_root))
 
         state["files"][0]["filename"] = "changelog.d/41-validator.md"
@@ -267,6 +344,251 @@ class ValidatorConformanceTests(unittest.TestCase):
             "issue-backed fragment filename must begin with the linked issue number",
             validator.validate_state(state, self.contract_root),
         )
+
+    def test_changelog_record_ignores_prose_headings_and_punctuation(self) -> None:
+        files, contents = self._owned_fragment()
+        state = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:required value:fragment-added",
+            files=files,
+            file_contents=contents,
+        )
+        findings = validator.validate_state(state, self.contract_root)
+        variant = copy.deepcopy(state)
+        variant["pull_request"]["body"] = (
+            "## 說明 — “unrelated”\n\n"
+            "Prose with bullets • and punctuation…\n\n"
+            + variant["pull_request"]["body"]
+            .replace("## Summary", "## Overview", 1)
+            .replace("## Changes", "## Amendments", 1)
+        )
+        self.assertEqual([], findings)
+        self.assertEqual(
+            findings, validator.validate_state(variant, self.contract_root)
+        )
+
+    def test_changelog_record_accepts_indentation(self) -> None:
+        state = self._with_changelog_line("    " + self._FIXTURE_CHANGELOG)
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+    def test_fenced_changelog_examples_are_not_records(self) -> None:
+        fenced = (
+            "```text\n"
+            "repo-ops.changelog.v1 kind:required value:fragment-added\n"
+            "```"
+        )
+        findings = validator.validate_state(
+            self._with_changelog_line(
+                fenced,
+                files=[{"filename": "CHANGELOG.md", "status": "modified"}],
+            ),
+            self.contract_root,
+        )
+        self.assertIn(self._EXACTLY_ONE_CHANGELOG, findings)
+        self._assert_no_lifecycle(findings)
+
+        state = self._with_changelog_line(
+            self._FIXTURE_CHANGELOG,
+            suffix="\n" + fenced + "\n",
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+        for deceptive_closer in ("```\N{NO-BREAK SPACE}", "```\N{LINE SEPARATOR}"):
+            with self.subTest(deceptive_closer=repr(deceptive_closer)):
+                deceptive_fence = (
+                    "```\n"
+                    f"{deceptive_closer}\n"
+                    f"{self._FIXTURE_CHANGELOG}\n"
+                )
+                findings = validator.validate_state(
+                    self._with_changelog_line(deceptive_fence),
+                    self.contract_root,
+                )
+                self.assertIn(self._EXACTLY_ONE_CHANGELOG, findings)
+                self._assert_no_lifecycle(findings)
+
+    def test_legacy_changelog_line_is_non_authoritative(self) -> None:
+        legacy = "- Changelog: required — users need the release note"
+        findings = validator.validate_state(
+            self._with_changelog_line(
+                legacy,
+                files=[{"filename": "CHANGELOG.md", "status": "modified"}],
+            ),
+            self.contract_root,
+        )
+        self.assertIn(self._EXACTLY_ONE_CHANGELOG, findings)
+        self._assert_no_lifecycle(findings)
+
+        state = self._with_changelog_line(
+            self._FIXTURE_CHANGELOG,
+            suffix="\n" + legacy + "\n",
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+    def test_changelog_candidate_count_precedes_lifecycle(self) -> None:
+        bait = [{"filename": "CHANGELOG.md", "status": "modified"}]
+        missing = validator.validate_state(
+            self._with_changelog_line("", files=bait),
+            self.contract_root,
+        )
+        duplicate = validator.validate_state(
+            self._with_changelog_line(
+                "repo-ops.changelog.v1 kind:required value:fragment-added\n"
+                "repo-ops.changelog.v1 kind:required value:fragment-added"
+            ),
+            self.contract_root,
+        )
+        valid_plus_malformed = validator.validate_state(
+            self._with_changelog_line(
+                "repo-ops.changelog.v1 kind:required value:fragment-added\n"
+                "repo-ops.changelog.v1 kind:required"
+            ),
+            self.contract_root,
+        )
+        for findings in (missing, duplicate, valid_plus_malformed):
+            with self.subTest(findings=findings):
+                self.assertIn(self._EXACTLY_ONE_CHANGELOG, findings)
+                self.assertNotIn(self._MALFORMED_CHANGELOG, findings)
+                self._assert_no_lifecycle(findings)
+
+    def test_malformed_changelog_records_precede_lifecycle(self) -> None:
+        bait = [{"filename": "CHANGELOG.md", "status": "modified"}]
+        lines = (
+            "repo-ops.changelog.v1 value:fragment-added kind:required",
+            "repo-ops.changelog.v1 kind:required",
+            "repo-ops.changelog.v1 kind:required value:fragment-added kind:required",
+            "repo-ops.changelog.v1 kind:required value:fragment-added extra:token",
+            "repo-ops.changelog.v1\tkind:required value:fragment-added",
+            "repo-ops.changelog.v1  kind:required value:fragment-added",
+            "repo-ops.changelog.v1 kind:required value:fragment-added leftover",
+        )
+        for line in lines:
+            with self.subTest(line=line):
+                findings = validator.validate_state(
+                    self._with_changelog_line(line, files=bait),
+                    self.contract_root,
+                )
+                self.assertIn(self._MALFORMED_CHANGELOG, findings)
+                self.assertNotIn(self._EXACTLY_ONE_CHANGELOG, findings)
+                self._assert_no_lifecycle(findings)
+
+    def test_changelog_schema_identity_precedes_lifecycle(self) -> None:
+        bait = [{"filename": "CHANGELOG.md", "status": "modified"}]
+        lines = (
+            "repo-ops.changelog.v1 kind:optional value:fragment-added",
+            "repo-ops.changelog.v1 kind:required value:Not_Valid",
+            "repo-ops.changelog.v1 kind:not-required value:replace-me",
+            "repo-ops.changelog.v1 kind:release value:v01.0.0",
+            "repo-ops.changelog.v1 kind:release value:v0.1.0-rc.1",
+        )
+        for line in lines:
+            with self.subTest(line=line):
+                findings = validator.validate_state(
+                    self._with_changelog_line(line, files=bait),
+                    self.contract_root,
+                )
+                self.assertTrue(
+                    any(
+                        self._CHANGELOG_SCHEMA_LABEL in finding
+                        for finding in findings
+                    ),
+                    findings,
+                )
+                self.assertNotIn(self._EXACTLY_ONE_CHANGELOG, findings)
+                self.assertNotIn(self._MALFORMED_CHANGELOG, findings)
+                self._assert_no_lifecycle(findings)
+
+    def test_changelog_lifecycle_kinds_are_preserved(self) -> None:
+        self.assertEqual([], self.findings("valid-required-fragment.json"))
+        files, contents = self._owned_fragment()
+        permitted = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:not-required value:plan-only",
+            files=files,
+            file_contents=contents,
+        )
+        self.assertEqual([], validator.validate_state(permitted, self.contract_root))
+
+        release = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:release value:v0.1.0",
+            files=[
+                {"filename": "CHANGELOG.md", "status": "modified"},
+                {
+                    "filename": "changelog.d/42-validator.md",
+                    "status": "removed",
+                },
+            ],
+        )
+        self.assertEqual([], validator.validate_state(release, self.contract_root))
+
+        missing_changelog = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:release value:v0.1.0",
+            files=[
+                {
+                    "filename": "changelog.d/42-validator.md",
+                    "status": "removed",
+                }
+            ],
+        )
+        self.assertIn(
+            "release changelog declarations must update CHANGELOG.md",
+            validator.validate_state(missing_changelog, self.contract_root),
+        )
+
+    def test_changelog_reason_code_does_not_change_lifecycle(self) -> None:
+        files, contents = self._owned_fragment()
+        added = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:required value:fragment-added",
+            files=files,
+            file_contents=contents,
+        )
+        users = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:required value:users-need-note",
+            files=files,
+            file_contents=contents,
+        )
+        self.assertEqual([], validator.validate_state(added, self.contract_root))
+        self.assertEqual(
+            validator.validate_state(added, self.contract_root),
+            validator.validate_state(users, self.contract_root),
+        )
+
+        missing_a = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:required value:fragment-added"
+        )
+        missing_b = self._with_changelog_line(
+            "repo-ops.changelog.v1 kind:required value:users-need-note"
+        )
+        findings_a = validator.validate_state(missing_a, self.contract_root)
+        findings_b = validator.validate_state(missing_b, self.contract_root)
+        self.assertEqual(findings_a, findings_b)
+        self.assertIn(
+            "required changelog declarations need an added or modified fragment",
+            findings_a,
+        )
+
+    def test_changelog_conformance_corpus(self) -> None:
+        corpus = validator.json.loads(
+            (self.fixtures / "changelog-conformance.json").read_text(encoding="utf-8")
+        )
+        for case in corpus["cases"]:
+            with self.subTest(case=case["name"]):
+                findings = self._changelog_corpus_findings(case["input"])
+                expected = case["expected"]
+                if expected["valid"]:
+                    self.assertEqual([], findings)
+                    continue
+                for needle in expected["findings"]:
+                    self.assertTrue(
+                        any(needle in finding for finding in findings),
+                        f"{case['name']}: expected {needle!r} in {findings!r}",
+                    )
+                structural = {
+                    self._EXACTLY_ONE_CHANGELOG,
+                    self._MALFORMED_CHANGELOG,
+                    self._CHANGELOG_SCHEMA_LABEL,
+                }
+                if structural.intersection(expected["findings"]):
+                    self._assert_no_lifecycle(findings)
+
 
     def test_fragment_parser_rejects_empty_bullets_and_unsupported_headings(self) -> None:
         with self.assertRaises(ValueError):

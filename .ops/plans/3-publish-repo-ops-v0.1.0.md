@@ -36,15 +36,13 @@ The trusted workflow separates contract validity from merge authorization. The w
 
 Plan approval is risk-dependent and authenticated by GitHub repository permission: low risk has no required plan or plan approval, medium risk requires a committed plan approved by an account with maintain, admin, or owner authority, and high risk requires a committed plan approved by the repository owner. The approval lives on the pull request, uses the established human-readable display plus one fenced `repo-ops.plan-approval.v1` record, and binds the Issue, accepted intent, plan digest, and plan commit. Agent review is evidence, not approval authority, when it is posted through the same GitHub identity.
 
-The pull request `Impact` section gains one exact changelog declaration:
+The pull request body contains one unfenced `repo-ops.changelog.v1` record:
 
 ```text
-- Changelog: required — <why users or operators need a release note>
-- Changelog: not-required — <why no release note is needed>
-- Changelog: release — vX.Y.Z
+repo-ops.changelog.v1 kind:<required|not-required|release> value:<token>
 ```
 
-`required` requires at least one added or modified fragment under the policy-declared root. `not-required` requires a non-empty rationale but no fragment. `release` is reserved for a release pull request, permits the generated changelog update and fragment consumption, and names the version being prepared. Ordinary pull requests may not edit `CHANGELOG.md` or delete fragments.
+`required` requires at least one added or modified fragment under the policy-declared root. `not-required` names a reason code and does not require a fragment solely by the declaration. `release` is reserved for a release pull request, permits the generated changelog update and fragment consumption, and names the version being prepared in `value`. Ordinary pull requests may not edit `CHANGELOG.md` or delete fragments.
 
 The repository policy uses `changelog.mode: fragments` with `root: changelog.d`. Issue-backed fragments use `<issue>-<slug>.md`, and the numeric prefix must equal the linked issue. Permitted direct low-risk changes use `direct-<slug>.md`; that form is invalid on an issue-backed route. A fragment contains one or more headings from `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`, with at least one non-empty bullet under each heading. `changelog.d/README.md` documents the format and is not a fragment.
 
@@ -69,7 +67,7 @@ Bootstrap merge, feature merge, the Issue #5 clean cutover, release merge, tag p
 9. Change all schema `$id` values to raw `v0.1.0` URLs and update alignment tests without changing schema payload contracts.
 10. Complete conformance and realistic folding verification, prove the risk-authority matrix and exact-head check revocation semantics, obtain exact-head review and maintainer merge approval, squash-merge the feature candidate, and verify the exact `main` commit and post-merge CI. Do not change repository rulesets in this pull request.
 11. Execute Issue #5 in its dedicated OMP session. Freeze the compatibility corpus before implementation, then add the fixture-only Go evaluator, differential conformance, live collector, sanitized event replay, shadow evidence, and benchmark record in separately reviewable `Related #5` pull requests. Maintain one `changelog.d/5-go-validator.md` fragment. Repair every compatibility or security divergence, then complete one clean cutover that removes the Python validator, uv, and validator runtime dependencies.
-12. From verified `main` after the Issue #5 cutover, run the folding command to prepare a release pull request using `Related #3` and `Changelog: release — v0.1.0`; create the dated `CHANGELOG.md` entry and delete exactly the consumed Issue #3 and Issue #5 fragments.
+12. From verified `main` after the Issue #5 cutover, run the folding command to prepare a release pull request using `Related #3` and `repo-ops.changelog.v1 kind:release value:v0.1.0`; create the dated `CHANGELOG.md` entry and delete exactly the consumed Issue #3 and Issue #5 fragments.
 13. Validate the release pull request under the current base-owned contract, record plan approval naming the latest governing `main` plan commit, obtain exact-head review, merge after maintainer approval, and verify the exact release candidate and post-merge CI.
 14. Request explicit approval for the `v*` tag-protection ruleset, apply and verify it, then request separate release approval naming the exact release candidate.
 15. After release approval, create annotated tag `v0.1.0` and publish GitHub Release notes with `Added`, `Changed`, `Fixed`, `Compatibility`, `Upgrade`, `Known limitations`, and `Rollback` sections. Identify the stable contract and merge-approval checks, shared-identity review as not independently authenticated, and the full commit SHA consumers must pin.
@@ -85,7 +83,7 @@ Before the feature merge, run `python -m unittest discover -s tests -v` and `git
 
 Run folding against a disposable copy containing representative fragments. Verify the exact generated `CHANGELOG.md`, consumed file set, stable ordering, and refusal to overwrite an existing version; discard only rehearsal output. Confirm repository policy schema validation, raw schema `$id` alignment, and that no consumer workflow accepts a branch or tag instead of a full commit SHA.
 
-After the feature merge, require green `CI / quality`, then complete Issue #5 with zero conformance divergence, preserved trust boundaries, and recorded startup, clean-CI p50/p95, peak-memory, workflow-step, and dependency measurements. Performance or complexity regressions require an explanation in the migration evidence but do not permit a permanent Python path. After the clean cutover, use the shipped folding command for the real release pull request. Prove that the generated changelog matches both fragments, exactly those fragments are deleted, no unrelated file is consumed, and the release declaration names `v0.1.0`. Require green post-merge CI on the exact release candidate.
+After the feature merge, require green `CI / quality`, then complete Issue #5 with zero conformance divergence, preserved trust boundaries, and recorded startup, clean-CI p50/p95, peak-memory, workflow-step, and dependency measurements. Performance or complexity regressions require an explanation in the migration evidence but do not permit a permanent Python path. After the clean cutover, use the shipped folding command for the real release pull request. Prove that the generated changelog matches both fragments, exactly those fragments are deleted, no unrelated file is consumed, and the v1 release record names `v0.1.0`. Require green post-merge CI on the exact release candidate.
 
 Before publication, verify the `v*` ruleset blocks tag update and deletion, compare the proposed tag target with the release candidate, and record separate release approval. After publication, verify the annotated tag resolves to the approved commit, the GitHub Release targets the same tag, every required release-note section is present, and every raw schema URL returns expected JSON.
 

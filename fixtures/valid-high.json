@@ -19,7 +19,7 @@
   },
   "pull_request": {
     "number": 9,
-    "body": "## Summary\n\nAdd the trusted repository policy validator.\n\n## Changes\n\n- Validate immutable approval and review receipts.\n\n## Impact\n\n- User/runtime: policy failures become visible before merge\n- API/schema/dependencies: adds the repository policy contract\n- Operations/deployment: no production deployment\n- Not changed: pull request heads remain untrusted input\n- Changelog: not-required — this fixture exercises receipt validation without a release-note change\n\n## Verification\n\n- Conformance fixtures — local runner — passed\n- Unverified: none\n\n## Risk and rollback\n\nRisk: high — changes repository policy enforcement\n\nRollback: revert the pull request\n\n## Related\n\nFixes #42\nPlan: .ops/plans/42-policy-validator.md\n",
+    "body": "## Summary\n\nAdd the trusted repository policy validator.\n\n## Changes\n\n- Validate immutable approval and review receipts.\n\n## Impact\n\n- User/runtime: policy failures become visible before merge\n- API/schema/dependencies: adds the repository policy contract\n- Operations/deployment: no production deployment\n- Not changed: pull request heads remain untrusted input\nrepo-ops.changelog.v1 kind:not-required value:receipt-validation\n\n## Verification\n\n- Conformance fixtures — local runner — passed\n- Unverified: none\n\n## Risk and rollback\n\nRisk: high — changes repository policy enforcement\n\nRollback: revert the pull request\n\n## Related\n\nFixes #42\nPlan: .ops/plans/42-policy-validator.md\n",
     "merge_base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "diff_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
