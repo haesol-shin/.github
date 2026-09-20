@@ -36,11 +36,37 @@ def normalize_text(value: str) -> str:
 
 def markdown_headings(body: str, level: int) -> list[str]:
     prefix = "#" * level
-    return [
-        line.rstrip()
-        for line in body.splitlines()
-        if re.fullmatch(rf"{re.escape(prefix)}(?!#)[ \t]+\S.*", line.rstrip())
-    ]
+    headings: list[str] = []
+    fence_character: str | None = None
+    fence_length = 0
+
+    for line in body.splitlines():
+        fence_match = re.match(r" {0,3}(?P<marker>`{3,}|~{3,})(?P<rest>.*)$", line)
+        if fence_character is not None:
+            if fence_match:
+                marker = fence_match.group("marker")
+                if (
+                    marker[0] == fence_character
+                    and len(marker) >= fence_length
+                    and not fence_match.group("rest").strip()
+                ):
+                    fence_character = None
+                    fence_length = 0
+            continue
+        if fence_match:
+            marker = fence_match.group("marker")
+            fence_character = marker[0]
+            fence_length = len(marker)
+            continue
+
+        heading_match = re.fullmatch(
+            rf" {{0,3}}{re.escape(prefix)}(?!#)[ \t]+(?P<title>\S.*?)[ \t]*",
+            line,
+        )
+        if heading_match:
+            headings.append(f"{prefix} {heading_match.group('title')}")
+
+    return headings
 
 
 def validate_heading_contract(

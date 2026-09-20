@@ -89,6 +89,23 @@ class ValidatorConformanceTests(unittest.TestCase):
             validator.validate_state(reordered, self.contract_root),
         )
 
+    def test_fenced_template_examples_are_not_counted_as_headings(self) -> None:
+        state, _ = validator.load_fixture(self.fixtures / "valid-high.json")
+        state["pull_request"]["body"] += (
+            "\n```markdown\n## Summary\n\nQuoted template.\n\n## Changes\n```\n"
+        )
+        state["issue_body"] += (
+            "\n~~~markdown\n## Problem\n\nQuoted template.\n\n## Context\n~~~\n"
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+    def test_commonmark_indented_headings_are_normalized(self) -> None:
+        state, _ = validator.load_fixture(self.fixtures / "valid-low-direct.json")
+        state["pull_request"]["body"] = state["pull_request"]["body"].replace(
+            "## Impact", "   ## Impact", 1
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
     def test_invalid_fixtures_fail_for_declared_reason(self) -> None:
         for path in sorted(self.fixtures.glob("invalid-*.json")):
             with self.subTest(path=path.name):
