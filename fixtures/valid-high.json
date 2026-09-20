@@ -25,7 +25,7 @@
     "diff_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   },
   "issue": 42,
-  "issue_body": "## Problem\n\nRepository approvals are not machine-validated.\n\n## Desired outcome\n\nTrusted validation rejects stale or malformed evidence.\n\n## Work\n\n- [ ] Add trusted contract validation.\n\n## Acceptance\n\n- [ ] Stale and malformed evidence is rejected by conformance fixtures.\n\n## Non-goals\n\n- Executing untrusted pull request code.\n\n## Context\n\nHigh-risk repository policy change governed by issue #42.\n",
+  "issue_body": "## Problem\n\nRepository approvals are not machine-validated.\n\n## Desired outcome\n\nTrusted validation rejects stale or malformed evidence.\n\n## Work\n\n- Add trusted contract validation.\n\n## Acceptance\n\n- Stale and malformed evidence is rejected by conformance fixtures.\n\n## Non-goals\n\n- Executing untrusted pull request code.\n\n## Context\n\nHigh-risk repository policy change governed by issue #42.\n",
   "intent_comments": [
     {
       "author": "maintainer",

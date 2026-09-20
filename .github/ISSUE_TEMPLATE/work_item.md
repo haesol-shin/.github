@@ -16,11 +16,11 @@ Describe what must become true, including material constraints.
 
 ## Work
 
-- [ ] List result-level deliverables, not file-by-file implementation steps.
+- List result-level deliverables, not file-by-file implementation steps.
 
 ## Acceptance
 
-- [ ] List observable behavior or evidence that proves completion.
+- List observable behavior or evidence that proves completion.
 
 ## Non-goals
 
