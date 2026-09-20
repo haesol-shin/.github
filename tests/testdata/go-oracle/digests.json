@@ -1,0 +1,47 @@
+{
+  "oracle_commit": "654d81f68ee1db5baf33c89016d3ddb659e98220",
+  "source": "tests/test_validator.py intent payloads and canonical plan_digest of an exact UTF-8 plan byte string",
+  "vectors": [
+    {
+      "id": "legacy_intent_high",
+      "kind": "canonical",
+      "payload": {
+        "outcome": "Add a trusted validator without executing pull request code.\n",
+        "risk": "high"
+      },
+      "digest": "sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871"
+    },
+    {
+      "id": "v1_intent_issue_42_high",
+      "kind": "canonical",
+      "payload": {
+        "issue": 42,
+        "outcome": "Add a trusted validator without executing pull request code.\n",
+        "risk": "high"
+      },
+      "digest": "sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc"
+    },
+    {
+      "id": "v1_intent_isolated_outcome",
+      "kind": "canonical",
+      "payload": {
+        "issue": 42,
+        "outcome": "The trusted validator remains isolated from pull request code.\n",
+        "risk": "high"
+      },
+      "digest": "sha256:09ff451b0fb47e8204c7a0a7f6d385c6eb3eb8bdf52e690c2941a0b2679bcef5"
+    },
+    {
+      "id": "plan_trusted_validator",
+      "kind": "plan",
+      "text": "Add a trusted validator without executing pull request code.",
+      "digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c"
+    },
+    {
+      "id": "plan_trusted_validator_crlf",
+      "kind": "plan",
+      "text": "Add a trusted validator without executing pull request code.\r\n",
+      "digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c"
+    }
+  ]
+}

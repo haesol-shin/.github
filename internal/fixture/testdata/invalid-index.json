@@ -1,0 +1,6 @@
+{
+  "extends": "base.json",
+  "replace": {
+    "items.9.v": "nope"
+  }
+}

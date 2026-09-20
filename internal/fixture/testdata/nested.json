@@ -1,0 +1,8 @@
+{
+  "extends": "base.json",
+  "replace": {
+    "nested.b.c": 3,
+    "items.0.v": "z"
+  },
+  "expected": "nested-ok"
+}

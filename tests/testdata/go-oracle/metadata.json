@@ -1,0 +1,21 @@
+{
+  "oracle_commit": "654d81f68ee1db5baf33c89016d3ddb659e98220",
+  "stage": 1,
+  "checks": [
+    "all",
+    "contract",
+    "merge-approval"
+  ],
+  "excluded_fixtures": [
+    "changelog-conformance.json",
+    "intent-comment-revocation.json"
+  ],
+  "excluded_reasons": {
+    "changelog-conformance.json": "folding-only",
+    "intent-comment-revocation.json": "workflow-only"
+  },
+  "annotation_prefix": "::warning title=Repository policy::",
+  "merge_approval_contract_block": "contract check did not succeed; merge approval is blocked",
+  "secret_scan": "fail if the injected environment value appears in captured bytes; do not treat the substring GITHUB_TOKEN as the leak oracle",
+  "fixture_goldens": "tests/testdata/go-oracle/matrix.json"
+}
