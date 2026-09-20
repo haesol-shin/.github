@@ -417,6 +417,7 @@ def capture(
     else:
         child.pop("GITHUB_STEP_SUMMARY", None)
     digest_path = dest / "digests.json"
+    digest_path.unlink(missing_ok=True)
     completed = subprocess.run(
         [*cmd, "--digest-out", str(digest_path)],
         cwd=cwd,
