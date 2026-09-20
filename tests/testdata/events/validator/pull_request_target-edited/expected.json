@@ -1,0 +1,32 @@
+{
+  "all": {
+    "exit": 1,
+    "findings": [
+      "pull request risk does not match accepted intent",
+      "merge-review risk does not match the current pull request"
+    ],
+    "check_conclusion": "failure",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:247981a39f8c3ddd7b773ca637986bf9bfc7cec657b62c46c2a853a6581e8a56"
+  },
+  "contract": {
+    "exit": 1,
+    "findings": [
+      "pull request risk does not match accepted intent"
+    ],
+    "check_conclusion": "failure",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:247981a39f8c3ddd7b773ca637986bf9bfc7cec657b62c46c2a853a6581e8a56"
+  },
+  "merge-approval": {
+    "exit": 1,
+    "findings": [
+      "contract check did not succeed; merge approval is blocked",
+      "pull request risk does not match accepted intent",
+      "merge-review risk does not match the current pull request"
+    ],
+    "check_conclusion": "failure",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:247981a39f8c3ddd7b773ca637986bf9bfc7cec657b62c46c2a853a6581e8a56"
+  }
+}

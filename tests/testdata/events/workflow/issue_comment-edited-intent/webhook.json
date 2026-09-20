@@ -1,0 +1,50 @@
+{
+  "action": "edited",
+  "issue": {
+    "number": 3,
+    "title": "Publish repo-ops v0.1.0",
+    "body": "## Problem\n\nNeed a trusted contract.\n",
+    "html_url": "https://github.com/haesol-shin/.github/issues/3",
+    "user": {
+      "login": "haesol-shin",
+      "id": 23266,
+      "type": "User"
+    },
+    "state": "open",
+    "pull_request": null
+  },
+  "comment": {
+    "id": 202,
+    "body": "repo-ops.intent.v1 decision:accepted risk:high issue:3\n\nSuperseding intent comment after editing the accepted outcome.\n",
+    "user": {
+      "login": "reviewer",
+      "id": 4739,
+      "type": "User"
+    },
+    "author_association": "MEMBER",
+    "html_url": "https://github.com/haesol-shin/.github/issues/3#issuecomment-202"
+  },
+  "changes": {
+    "body": {
+      "from": "Intent accepted.\n\nPrevious accepted outcome for Issue #3.\n\nrepo-ops.intent.v1 decision:accepted risk:high issue:3\n"
+    }
+  },
+  "repository": {
+    "id": 1,
+    "name": ".github",
+    "full_name": "haesol-shin/.github",
+    "private": false,
+    "owner": {
+      "login": "haesol-shin",
+      "id": 23266,
+      "type": "User"
+    },
+    "html_url": "https://github.com/haesol-shin/.github",
+    "clone_url": "https://github.com/haesol-shin/.github.git"
+  },
+  "sender": {
+    "login": "reviewer",
+    "id": 4739,
+    "type": "User"
+  }
+}

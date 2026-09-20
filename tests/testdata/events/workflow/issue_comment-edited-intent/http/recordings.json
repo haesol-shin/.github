@@ -1,0 +1,186 @@
+[
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/collaborators/reviewer/permission",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "permission": "maintain",
+      "role_name": "maintain",
+      "user": {
+        "login": "reviewer",
+        "id": 4739,
+        "type": "User"
+      }
+    },
+    "request": {
+      "headers": {
+        "Authorization": "REDACTED",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/pulls?state=open&per_page=100",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "Link": "<{api}/repos/haesol-shin/.github/pulls?state=open&per_page=100&page=2>; rel=\"next\""
+    },
+    "body": [
+      {
+        "number": 6,
+        "state": "open",
+        "title": "Repair policy publication",
+        "body": "## Summary\n\nKeep intent authority on Issue #3.\n\nRelated #3\n",
+        "html_url": "https://github.com/haesol-shin/.github/pull/6",
+        "user": {
+          "login": "haesol-shin",
+          "id": 23266,
+          "type": "User"
+        },
+        "head": {
+          "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "ref": "6-repair-policy-publication",
+          "repo": {
+            "full_name": "haesol-shin/.github",
+            "clone_url": "https://github.com/haesol-shin/.github.git"
+          }
+        },
+        "base": {
+          "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "main",
+          "repo": {
+            "full_name": "haesol-shin/.github",
+            "clone_url": "https://github.com/haesol-shin/.github.git"
+          }
+        },
+        "draft": false
+      },
+      {
+        "number": 7,
+        "state": "open",
+        "title": "Unrelated docs",
+        "body": "Direct low-risk PR: docs only.\nMentions issue #3 in prose but does not link it.\n",
+        "html_url": "https://github.com/haesol-shin/.github/pull/7",
+        "user": {
+          "login": "haesol-shin",
+          "id": 23266,
+          "type": "User"
+        },
+        "head": {
+          "sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "docs",
+          "repo": {
+            "full_name": "haesol-shin/.github",
+            "clone_url": "https://github.com/haesol-shin/.github.git"
+          }
+        },
+        "base": {
+          "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "main",
+          "repo": {
+            "full_name": "haesol-shin/.github",
+            "clone_url": "https://github.com/haesol-shin/.github.git"
+          }
+        },
+        "draft": false
+      }
+    ],
+    "request": {
+      "headers": {
+        "Authorization": "REDACTED",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/pulls?state=open&per_page=100&page=2",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": [],
+    "request": {
+      "headers": {
+        "Authorization": "REDACTED",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "url": "/repos/haesol-shin/.github/check-runs",
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "id": 9101,
+      "name": "contract",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "status": "completed",
+      "conclusion": "failure",
+      "output": {
+        "title": "Intent authority changed",
+        "summary": "Policy checks revoked until the linked pull request is revalidated."
+      }
+    },
+    "request": {
+      "headers": {
+        "Authorization": "REDACTED",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      },
+      "form": {
+        "name": "contract",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "completed",
+        "conclusion": "failure",
+        "output[title]": "Intent authority changed",
+        "output[summary]": "Policy checks revoked until the linked pull request is revalidated."
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "url": "/repos/haesol-shin/.github/check-runs",
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "id": 9102,
+      "name": "merge approval",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "status": "completed",
+      "conclusion": "failure",
+      "output": {
+        "title": "Intent authority changed",
+        "summary": "Policy checks revoked until the linked pull request is revalidated."
+      }
+    },
+    "request": {
+      "headers": {
+        "Authorization": "REDACTED",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      },
+      "form": {
+        "name": "merge approval",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "completed",
+        "conclusion": "failure",
+        "output[title]": "Intent authority changed",
+        "output[summary]": "Policy checks revoked until the linked pull request is revalidated."
+      }
+    }
+  }
+]

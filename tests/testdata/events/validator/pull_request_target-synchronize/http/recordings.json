@@ -1,0 +1,280 @@
+[
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/contents/.github/repo-policy.yml?ref=4778e2f9cd195c6c4cdc0f5cd04118bba6298a23",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "name": "repo-policy.yml",
+      "path": ".github/repo-policy.yml",
+      "sha": "d27e368cf11ad402901c2ab213ca387faed9bc6e",
+      "size": 236,
+      "encoding": "base64",
+      "content": "Y29udHJhY3Q6IHJlcG8tb3BzL3YwLjEuMApwcm9maWxlOiBvcGVyYXRpb25z\nCnF1YWxpdHk6CiAgY2hlY2s6IHF1YWxpdHkKICBjb21tYW5kczoKICAgIC0g\ncHl0aG9uIC1tIHVuaXR0ZXN0IGRpc2NvdmVyIC1zIHRlc3RzIC12CnJldmll\ndzoKICBzaGFyZWRfaWRlbnRpdHk6IHRydWUKY2hhbmdlbG9nOgogIG1vZGU6\nIGZyYWdtZW50cwogIHJvb3Q6IGNoYW5nZWxvZy5kCnJlbGVhc2U6CiAgZW5h\nYmxlZDogdHJ1ZQo=\n",
+      "type": "file"
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/pulls/204/files?per_page=100",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": [
+      {
+        "filename": "changelog.d/42-replay-evidence.md",
+        "status": "added",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2
+      },
+      {
+        "filename": ".ops/plans/42-replay.md",
+        "status": "added",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1
+      },
+      {
+        "filename": "actions/repository-policy/validate.py",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1,
+        "changes": 3
+      },
+      {
+        "filename": "actions/repository-policy/action.yml",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2
+      },
+      {
+        "filename": "contracts/v0.1.0/contract.json",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2
+      },
+      {
+        "filename": ".github/repo-policy.yml",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "changes": 2
+      },
+      {
+        "filename": "assets/blob.bin",
+        "status": "added",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1
+      },
+      {
+        "filename": "docs/quoted path/你好.bin",
+        "status": "added",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1
+      },
+      {
+        "filename": "obsolete.txt",
+        "status": "removed",
+        "additions": 0,
+        "deletions": 1,
+        "changes": 1
+      },
+      {
+        "filename": "README.md",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0,
+        "changes": 1
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/contents/changelog.d/42-replay-evidence.md?ref=0877c3dfd687ba286afb5aa756b057631ae0b5f8",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "name": "42-replay-evidence.md",
+      "path": "changelog.d/42-replay-evidence.md",
+      "sha": "4d930baa04346f63d85781ca542f2f7d8815611c",
+      "size": 60,
+      "encoding": "base64",
+      "content": "IyMgQWRkZWQKLSBBZGQgcmVwbGF5IGV2aWRlbmNlIGZvciBjb2xsZWN0b3Ig\nZXZlbnQgYnVuZGxlcy4K\n",
+      "type": "file"
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/compare/4778e2f9cd195c6c4cdc0f5cd04118bba6298a23...0877c3dfd687ba286afb5aa756b057631ae0b5f8",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "status": "ahead",
+      "ahead_by": 1,
+      "behind_by": 0,
+      "merge_base_commit": {
+        "sha": "4778e2f9cd195c6c4cdc0f5cd04118bba6298a23"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/issues/204/comments?per_page=100",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": [
+      {
+        "id": 1,
+        "user": {
+          "login": "maintainer"
+        },
+        "author_association": "OWNER",
+        "body": "**Plan approved**\n\n- Risk: `high`\n- Intent digest: `sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871`\n- Plan digest: `sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c`\n- Plan commit: `e8ed4488e961a19aa7ec13648efe29e83bebb7b9`\n\nAuthoritative machine-readable record:\n\n```text\nrepo-ops.plan-approval.v1 decision:approved risk:high issue:42 intent:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871 plan:sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c plan-commit:e8ed4488e961a19aa7ec13648efe29e83bebb7b9\n```\n"
+      },
+      {
+        "id": 2,
+        "user": {
+          "login": "maintainer"
+        },
+        "author_association": "OWNER",
+        "body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:high intent:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871 plan:sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c base:4778e2f9cd195c6c4cdc0f5cd04118bba6298a23 head:3a74bd6a89bed322bb8dacaccafd3bd5bc9f1699 diff:sha256:247981a39f8c3ddd7b773ca637986bf9bfc7cec657b62c46c2a853a6581e8a56 runtime:omp/0.1 model:provider/model"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/pulls/204/reviews?per_page=100",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": []
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/issues/42",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "number": 42,
+      "title": "Trusted validator",
+      "body": "## Problem\n\nRepository approvals are not machine-validated.\n\n## Desired outcome\n\nTrusted validation rejects stale or malformed evidence.\n\n## Work\n\n- Add trusted contract validation.\n\n## Acceptance\n\n- Stale and malformed evidence is rejected by conformance fixtures.\n\n## Non-goals\n\n- Executing untrusted pull request code.\n\n## Context\n\nHigh-risk repository policy change governed by issue #42.\n"
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/issues/42/comments?per_page=100",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": [
+      {
+        "id": 900,
+        "user": {
+          "login": "maintainer"
+        },
+        "author_association": "OWNER",
+        "body": "Intent accepted.\n\nAdd a trusted validator without executing pull request code.\n\nRisk: high\nIntent digest: sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871\n"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/collaborators/maintainer/permission",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "permission": "admin",
+      "user": {
+        "login": "maintainer"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/contents/.ops/plans/42-replay.md?ref=0877c3dfd687ba286afb5aa756b057631ae0b5f8",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "name": "42-replay.md",
+      "path": ".ops/plans/42-replay.md",
+      "sha": "333fa3b441aa0f7bf78e98e3ab3181475e36decc",
+      "size": 61,
+      "encoding": "base64",
+      "content": "QWRkIGEgdHJ1c3RlZCB2YWxpZGF0b3Igd2l0aG91dCBleGVjdXRpbmcgcHVs\nbCByZXF1ZXN0IGNvZGUuCg==\n",
+      "type": "file"
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/compare/e8ed4488e961a19aa7ec13648efe29e83bebb7b9...0877c3dfd687ba286afb5aa756b057631ae0b5f8",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "status": "ahead",
+      "ahead_by": 1,
+      "behind_by": 0,
+      "merge_base_commit": {
+        "sha": "e8ed4488e961a19aa7ec13648efe29e83bebb7b9"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/contents/.ops/plans/42-replay.md?ref=e8ed4488e961a19aa7ec13648efe29e83bebb7b9",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "name": "42-replay.md",
+      "path": ".ops/plans/42-replay.md",
+      "sha": "333fa3b441aa0f7bf78e98e3ab3181475e36decc",
+      "size": 61,
+      "encoding": "base64",
+      "content": "QWRkIGEgdHJ1c3RlZCB2YWxpZGF0b3Igd2l0aG91dCBleGVjdXRpbmcgcHVs\nbCByZXF1ZXN0IGNvZGUuCg==\n",
+      "type": "file"
+    }
+  },
+  {
+    "method": "GET",
+    "url": "/repos/haesol-shin/.github/commits/0877c3dfd687ba286afb5aa756b057631ae0b5f8/check-runs?per_page=100",
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "total_count": 1,
+      "check_runs": [
+        {
+          "name": "quality",
+          "conclusion": "success",
+          "head_sha": "0877c3dfd687ba286afb5aa756b057631ae0b5f8"
+        }
+      ]
+    }
+  }
+]

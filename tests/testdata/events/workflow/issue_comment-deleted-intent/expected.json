@@ -1,0 +1,18 @@
+{
+  "job": "intent-revocation",
+  "linked_open_pull_heads": [
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ],
+  "check_runs": [
+    {
+      "name": "contract",
+      "conclusion": "failure",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "name": "merge approval",
+      "conclusion": "failure",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}
