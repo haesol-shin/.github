@@ -23,6 +23,236 @@ class ValidatorConformanceTests(unittest.TestCase):
         state, _ = validator.load_fixture(self.fixtures / name)
         return validator.validate_state(state, self.contract_root)
 
+    def v1_comment(
+        self,
+        *,
+        issue: int,
+        outcome: str,
+        risk: str,
+        supersedes: str,
+    ) -> tuple[str, str]:
+        digest = validator.canonical_digest(
+            {
+                "issue": issue,
+                "outcome": validator.normalize_text(outcome),
+                "risk": risk,
+            }
+        )
+        body = (
+            "**Intent accepted**\n\n"
+            f"{outcome}\n\n"
+            f"- Risk: `{risk}`\n"
+            f"- Intent digest: `{digest}`\n"
+            f"- Supersedes: `{supersedes}`\n\n"
+            "Authoritative machine-readable record:\n\n"
+            "```text\n"
+            f"repo-ops.intent.v1 decision:accepted risk:{risk} "
+            f"intent:{digest} supersedes:{supersedes}\n"
+            "```\n"
+        )
+        return body, digest
+
+    def v1_state(self) -> dict:
+        state, _ = validator.load_fixture(self.fixtures / "valid-v1-related.json")
+        return state
+
+    def test_valid_v1_related_route(self) -> None:
+        self.assertEqual([], validator.validate_state(self.v1_state(), self.contract_root))
+
+    def test_v1_digest_is_issue_bound_and_display_values_are_checked(self) -> None:
+        state = self.v1_state()
+        state["issue"] = 43
+        findings = validator.validate_state(state, self.contract_root)
+        self.assertIn(
+            "accepted-intent digest does not match its canonical issue-bound payload",
+            findings,
+        )
+
+        state["intent_comments"][1]["body"] = state["intent_comments"][1]["body"].replace(
+            "- Risk: `high`",
+            "- Risk: `medium`",
+            1,
+        )
+        self.assertIn(
+            "accepted-intent displayed risk does not match its raw record",
+            validator.validate_state(state, self.contract_root),
+        )
+        for field, replacement, expected in (
+            ("Intent digest", "sha256:" + "0" * 64, "displayed digest"),
+            ("Supersedes", "none", "displayed supersession"),
+        ):
+            state = self.v1_state()
+            parsed, error = validator.parse_intent(
+                state["intent_comments"][1]["body"],
+                issue=42,
+                contract_root=self.contract_root,
+            )
+            self.assertIsNone(error)
+            assert parsed is not None
+            original = parsed["digest"] if field == "Intent digest" else parsed["supersedes"]
+            state["intent_comments"][1]["body"] = state["intent_comments"][1][
+                "body"
+            ].replace(f"- {field}: `{original}`", f"- {field}: `{replacement}`", 1)
+            self.assertIn(
+                f"accepted-intent {expected} does not match its raw record",
+                validator.validate_state(state, self.contract_root),
+            )
+
+    def test_v1_migrates_legacy_and_requires_supersession(self) -> None:
+        state = self.v1_state()
+        body = state["intent_comments"][1]["body"]
+        state["intent_comments"][1]["body"] = body.replace(
+            "supersedes:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871",
+            "supersedes:none",
+        ).replace(
+            "- Supersedes: `sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871`",
+            "- Supersedes: `none`",
+        )
+        self.assertIn(
+            "repo-ops.intent.v1 supersedes does not match the current intent",
+            validator.validate_state(state, self.contract_root),
+        )
+
+    def test_first_v1_without_legacy_uses_none(self) -> None:
+        state = self.v1_state()
+        state["intent_comments"].pop(0)
+        body = state["intent_comments"][0]["body"]
+        state["intent_comments"][0]["body"] = body.replace(
+            "supersedes:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871",
+            "supersedes:none",
+        ).replace(
+            "- Supersedes: `sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871`",
+            "- Supersedes: `none`",
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+    def test_v1_replacements_form_one_chain_head(self) -> None:
+        state = self.v1_state()
+        first = validator.parse_intent(state["intent_comments"][1]["body"], 42)[0]
+        assert first is not None
+        second_body, second_digest = self.v1_comment(
+            issue=42,
+            outcome="The trusted validator remains isolated from pull request code.",
+            risk="high",
+            supersedes=first["digest"],
+        )
+        state["intent_comments"].append(
+            {"author": "maintainer", "association": "OWNER", "body": second_body}
+        )
+        state["comments"][0]["body"] = state["comments"][0]["body"].replace(
+            first["digest"],
+            second_digest,
+        )
+        state["comments"][1]["body"] = state["comments"][1]["body"].replace(
+            first["digest"],
+            second_digest,
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+        broken_body, _ = self.v1_comment(
+            issue=42,
+            outcome="A broken replacement must not become current authority.",
+            risk="high",
+            supersedes="none",
+        )
+        state["intent_comments"].append(
+            {"author": "maintainer", "association": "OWNER", "body": broken_body}
+        )
+        self.assertIn(
+            "repo-ops.intent.v1 supersedes does not match the current intent",
+            validator.validate_state(state, self.contract_root),
+        )
+
+    def test_malformed_v1_record_is_rejected(self) -> None:
+        state = self.v1_state()
+        state["intent_comments"][1]["body"] = state["intent_comments"][1]["body"].replace(
+            "decision:accepted",
+            "decision:approved",
+            1,
+        )
+        self.assertTrue(
+            any(
+                "repo-ops.intent.v1" in finding
+                for finding in validator.validate_state(state, self.contract_root)
+            )
+        )
+
+    def test_authority_links_are_single_and_closes_remains_supported(self) -> None:
+        state = self.v1_state()
+        state["pull_request"]["body"] = state["pull_request"]["body"].replace(
+            "Related #42",
+            "Fixes #42\nCloses #42",
+            1,
+        )
+        self.assertTrue(
+            any(
+                "exactly one standalone issue authority line" in finding
+                for finding in validator.validate_state(state, self.contract_root)
+            )
+        )
+
+        legacy = validator.load_fixture(self.fixtures / "valid-high.json")[0]
+        legacy["pull_request"]["body"] = legacy["pull_request"]["body"].replace(
+            "Fixes #42",
+            "Closes #42",
+            1,
+        )
+        self.assertEqual([], validator.validate_state(legacy, self.contract_root))
+
+    def test_authority_parsing_ignores_prose_and_fenced_route_examples(self) -> None:
+        state = self.v1_state()
+        state["pull_request"]["body"] = state["pull_request"]["body"].replace(
+            "Add the trusted repository policy validator.",
+            "Fixes the flaky scheduler race.\n"
+            "Closes the gap between plan and review.\n"
+            "Related work is tracked separately.\n\n"
+            "Add the trusted repository policy validator.",
+            1,
+        )
+        state["pull_request"]["body"] += (
+            "\n```markdown\nDirect low-risk PR: documentation-only update\n```\n"
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+        body = state["pull_request"]["body"] + "\nFixes #not-an-issue\n"
+        self.assertEqual(42, validator.parse_related_issue(body))
+        self.assertTrue(validator.parse_authority_links(body)[1])
+
+    def test_markdown_code_cannot_hide_or_invent_authority(self) -> None:
+        visible = "Related #42\n``` x ```\nFixes #99\n"
+        links, errors = validator.parse_authority_links(visible)
+        self.assertEqual([42, 99], [link["issue"] for link in links])
+        self.assertTrue(
+            any("exactly one standalone issue authority line" in error for error in errors)
+        )
+
+        indented = (
+            "Related #42\n\n"
+            "    Fixes #99\n"
+            "    Direct low-risk PR: example only\n"
+        )
+        self.assertEqual(42, validator.parse_related_issue(indented))
+        self.assertFalse(validator.is_direct_low_risk(indented))
+
+    def test_fenced_intent_examples_are_not_authority(self) -> None:
+        examples = (
+            "```text\n"
+            "repo-ops.intent.v1 decision:accepted risk:high "
+            "intent:sha256:<digest> supersedes:<previous>\n"
+            "```\n",
+            "```text\nIntent accepted.\nIntent digest: sha256:<digest>\n```\n",
+        )
+        for body in examples:
+            self.assertEqual(
+                (None, None),
+                validator.parse_intent(
+                    body,
+                    issue=42,
+                    contract_root=self.contract_root,
+                ),
+            )
+
+
     def test_valid_low_direct_route(self) -> None:
         self.assertEqual([], self.findings("valid-low-direct.json"))
 

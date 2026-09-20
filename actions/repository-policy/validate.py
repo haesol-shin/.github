@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from collections.abc import Iterator
 import hashlib
 import json
 import os
@@ -26,6 +27,7 @@ RECORD_ORDERS = {
     record: tuple(definition["field_order"])
     for record, definition in CONTRACT["records"].items()
 }
+AUTHORITY_LINKS = CONTRACT["pull_request"].get("authority_links", {})
 AUTHORIZED_ASSOCIATIONS = {"OWNER", "MEMBER"}
 
 
@@ -34,12 +36,9 @@ def normalize_text(value: str) -> str:
     return f"{normalized}\n"
 
 
-def markdown_headings(body: str, level: int) -> list[str]:
-    prefix = "#" * level
-    headings: list[str] = []
+def unfenced_lines(body: str) -> Iterator[str]:
     fence_character: str | None = None
     fence_length = 0
-
     for line in body.splitlines():
         fence_match = re.match(r" {0,3}(?P<marker>`{3,}|~{3,})(?P<rest>.*)$", line)
         if fence_character is not None:
@@ -55,10 +54,25 @@ def markdown_headings(body: str, level: int) -> list[str]:
             continue
         if fence_match:
             marker = fence_match.group("marker")
+            if marker[0] == "`" and "`" in fence_match.group("rest"):
+                yield line
+                continue
             fence_character = marker[0]
             fence_length = len(marker)
             continue
+        yield line
 
+
+def markdown_block_lines(body: str) -> Iterator[str]:
+    for line in unfenced_lines(body):
+        if re.match(r" {0,3}\S", line):
+            yield line
+
+
+def markdown_headings(body: str, level: int) -> list[str]:
+    prefix = "#" * level
+    headings: list[str] = []
+    for line in markdown_block_lines(body):
         heading_match = re.fullmatch(
             rf" {{0,3}}{re.escape(prefix)}(?!#)[ \t]+(?P<title>\S.*?)[ \t]*",
             line,
@@ -156,13 +170,47 @@ def parse_risk(body: str) -> str | None:
     return match.group(1) if match else None
 
 
+def parse_authority_links(body: str) -> tuple[list[dict[str, Any]], list[str]]:
+    keywords = tuple(AUTHORITY_LINKS.get("keywords", ("Fixes", "Closes", "Related")))
+    keyword_pattern = "|".join(re.escape(keyword) for keyword in keywords)
+    valid_pattern = re.compile(
+        rf"^(?:{keyword_pattern})[ \t]+#(?P<issue>[1-9][0-9]*)$",
+        flags=re.IGNORECASE,
+    )
+    candidate_pattern = re.compile(
+        rf"^(?:{keyword_pattern})[ \t]*#",
+        flags=re.IGNORECASE,
+    )
+    links: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for line in markdown_block_lines(body):
+        stripped = line.strip()
+        if not candidate_pattern.match(stripped):
+            continue
+        match = valid_pattern.fullmatch(stripped)
+        if not match:
+            errors.append("issue authority lines must use `Fixes|Closes|Related #<issue>`")
+            continue
+        links.append(
+            {
+                "issue": int(match.group("issue")),
+            }
+        )
+    if AUTHORITY_LINKS.get("exactly_one", True) and len(links) > 1:
+        errors.append("pull request must contain exactly one standalone issue authority line")
+    return links, errors
+
+
 def parse_related_issue(body: str) -> int | None:
-    match = re.search(r"(?mi)^\s*(?:Fixes|Closes)\s+#(\d+)\s*$", body)
-    return int(match.group(1)) if match else None
+    links, _ = parse_authority_links(body)
+    if len(links) != 1:
+        return None
+    return int(links[0]["issue"])
 
 
 def is_direct_low_risk(body: str) -> bool:
-    return bool(re.search(r"(?mi)^\s*Direct low-risk PR:\s*\S", body))
+    pattern = re.compile(r"(?i)^\s*Direct low-risk PR:\s*\S")
+    return any(pattern.search(line) for line in markdown_block_lines(body))
 
 
 def parse_plan_path(body: str) -> str | None:
@@ -186,15 +234,91 @@ def parse_plan_path(body: str) -> str | None:
     return value if value.startswith(".ops/plans/") else None
 
 
-def parse_intent(body: str) -> tuple[dict[str, str] | None, str | None]:
+def parse_intent(
+    body: str,
+    issue: int | None = None,
+    contract_root: Path | None = None,
+) -> tuple[dict[str, Any] | None, str | None]:
     normalized = normalize_text(body)
+    unfenced = "\n".join(markdown_block_lines(normalized))
+    has_v1_marker = bool(
+        re.search(r"(?m)^\*\*Intent accepted\*\*\s*$", unfenced)
+        or re.search(r"(?m)^\s*repo-ops\.intent\.v1\b", unfenced)
+    )
+    if has_v1_marker:
+        match = re.fullmatch(
+            r"\*\*Intent accepted\*\*\n\n"
+            r"(?P<outcome>.+?)\n\n"
+            r"- Risk: `(?P<display_risk>low|medium|high)`\n"
+            r"- Intent digest: `(?P<display_digest>sha256:[0-9a-f]{64})`\n"
+            r"- Supersedes: `(?P<display_supersedes>none|sha256:[0-9a-f]{64})`\n\n"
+            r"Authoritative machine-readable record:\n\n"
+            r"```text\n(?:repo-ops\.intent\.v1[^\n]*)\n```\n",
+            normalized,
+            flags=re.DOTALL,
+        )
+        if not match:
+            return None, "malformed repo-ops.intent.v1 accepted-intent comment"
+
+        record, record_error = parse_record_line(body, "repo-ops.intent.v1")
+        if record_error:
+            return None, record_error
+        if record is None:
+            return None, "repo-ops.intent.v1 record is missing"
+        schema_errors = validate_schema(
+            record,
+            (contract_root or CONTRACT_ROOT) / "intent.schema.json",
+            "repo-ops.intent.v1",
+        )
+        if schema_errors:
+            return None, schema_errors[0]
+        if (
+            issue is None
+            or isinstance(issue, bool)
+            or not isinstance(issue, int)
+            or issue < 1
+        ):
+            return None, "repo-ops.intent.v1 requires a positive linked issue"
+
+        outcome = match.group("outcome")
+        computed = canonical_digest(
+            {
+                "issue": issue,
+                "outcome": normalize_text(outcome),
+                "risk": record["risk"],
+            }
+        )
+        if match.group("display_risk") != record["risk"]:
+            return None, "accepted-intent displayed risk does not match its raw record"
+        if match.group("display_digest") != record["intent"]:
+            return None, "accepted-intent displayed digest does not match its raw record"
+        if match.group("display_supersedes") != record["supersedes"]:
+            return None, "accepted-intent displayed supersession does not match its raw record"
+        if record["intent"] != computed:
+            return None, "accepted-intent digest does not match its canonical issue-bound payload"
+        return {
+            "kind": "v1",
+            "digest": computed,
+            "risk": record["risk"],
+            "supersedes": record["supersedes"],
+            "outcome": outcome,
+        }, None
+
+    has_legacy_marker = bool(
+        re.search(r"(?m)^Intent accepted\.\s*$", unfenced)
+        or re.search(r"(?m)^Intent digest:", unfenced)
+    )
+    if not has_legacy_marker:
+        return None, None
     match = re.fullmatch(
-        r"Intent accepted\.\n\n(?P<outcome>.+?)\n\nRisk: (?P<risk>low|medium|high)\nIntent digest: (?P<digest>sha256:[0-9a-f]{64})\n",
+        r"Intent accepted\.\n\n(?P<outcome>.+?)\n\n"
+        r"Risk: (?P<risk>low|medium|high)\n"
+        r"Intent digest: (?P<digest>sha256:[0-9a-f]{64})\n",
         normalized,
         flags=re.DOTALL,
     )
     if not match:
-        return None, None
+        return None, "malformed legacy accepted-intent comment"
     computed = canonical_digest(
         {
             "outcome": normalize_text(match.group("outcome")),
@@ -203,7 +327,12 @@ def parse_intent(body: str) -> tuple[dict[str, str] | None, str | None]:
     )
     if computed != match.group("digest"):
         return None, "accepted-intent digest does not match its canonical payload"
-    return {"digest": computed, "risk": match.group("risk")}, None
+    return {
+        "kind": "legacy",
+        "digest": computed,
+        "risk": match.group("risk"),
+        "outcome": match.group("outcome"),
+    }, None
 
 
 def parse_round(value: str, *, allow_none: bool) -> tuple[int | None, int | None]:
@@ -259,13 +388,27 @@ def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
     if risk is None:
         errors.append("pull request body must contain `Risk: low|medium|high — rationale`")
         return errors
-
     issue = state.get("issue")
+    authority_links, authority_errors = parse_authority_links(body)
+    errors.extend(authority_errors)
     direct = is_direct_low_risk(body)
-    if direct and risk != "low":
-        errors.append("only low-risk work may use the direct pull request route")
-    if not direct and issue is None:
-        errors.append("non-direct work must link an issue with `Fixes #<issue>`")
+    if direct:
+        if risk != "low":
+            errors.append("only low-risk work may use the direct pull request route")
+        if authority_links:
+            errors.append("direct low-risk work must not include issue authority")
+        if issue is not None:
+            errors.append("direct low-risk work must not link an issue")
+    elif not authority_errors:
+        if len(authority_links) != 1:
+            errors.append(
+                "non-direct work must link an issue with `Fixes #<issue>` "
+                "(or `Closes #<issue>` or `Related #<issue>`)"
+            )
+        elif issue is None:
+            errors.append("issue authority requires a linked issue")
+        elif authority_links[0]["issue"] != issue:
+            errors.append("issue authority does not match the linked issue")
     comments = state.get("comments") or []
     if issue is not None:
         issue_body = state.get("issue_body") or ""
@@ -286,20 +429,40 @@ def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
 
     expected_intent = "none"
     if issue is not None:
-        intents: list[dict[str, str]] = []
+        chain_head: dict[str, Any] | None = None
+        saw_v1 = False
         for comment in state.get("intent_comments") or []:
             if comment.get("association") not in AUTHORIZED_ASSOCIATIONS:
                 continue
-            parsed_intent, intent_error = parse_intent(comment.get("body") or "")
+            parsed_intent, intent_error = parse_intent(
+                comment.get("body") or "",
+                issue,
+                contract_root,
+            )
             if intent_error:
                 errors.append(intent_error)
-            elif parsed_intent:
-                intents.append(parsed_intent)
-        if not intents:
+                continue
+            if parsed_intent is None:
+                continue
+            if parsed_intent["kind"] == "legacy":
+                if saw_v1:
+                    errors.append("legacy accepted intent cannot follow a v1 intent record")
+                else:
+                    chain_head = parsed_intent
+                continue
+
+            saw_v1 = True
+            expected_supersedes = chain_head["digest"] if chain_head else "none"
+            if parsed_intent["supersedes"] != expected_supersedes:
+                errors.append("repo-ops.intent.v1 supersedes does not match the current intent")
+                continue
+            chain_head = parsed_intent
+
+        if chain_head is None:
             errors.append("linked issue has no valid maintainer accepted-intent comment")
         else:
-            expected_intent = intents[-1]["digest"]
-            if intents[-1]["risk"] != risk:
+            expected_intent = chain_head["digest"]
+            if chain_head["risk"] != risk:
                 errors.append("pull request risk does not match accepted intent")
 
     expected_plan = state.get("plan_digest") or "none"

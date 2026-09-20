@@ -12,7 +12,11 @@
     "required_heading_occurrences": 1,
     "required_heading_order": true,
     "required_headings": ["## Summary", "## Changes", "## Impact", "## Verification", "## Risk and rollback", "## Related"],
-    "allow_additional_headings": true
+    "allow_additional_headings": true,
+    "authority_links": {
+      "keywords": ["Fixes", "Closes", "Related"],
+      "exactly_one": true
+    }
   },
   "round_limits": {
     "low": {
@@ -36,6 +40,10 @@
     "repo-ops.merge-review.v1": {
       "schema": "merge-review.schema.json",
       "field_order": ["verdict", "risk", "intent", "plan", "plan-round", "implementation-round", "base", "head", "diff", "runtime", "model"]
+    },
+    "repo-ops.intent.v1": {
+      "schema": "intent.schema.json",
+      "field_order": ["decision", "risk", "intent", "supersedes"]
     }
   },
   "repository_policy_schema": "repository-policy.schema.json"
