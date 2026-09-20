@@ -21,20 +21,7 @@
       "allowed_fragment_sections": ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
     }
   },
-  "round_limits": {
-    "low": {
-      "plan": null,
-      "implementation": 2
-    },
-    "medium": {
-      "plan": 3,
-      "implementation": 3
-    },
-    "high": {
-      "plan": 5,
-      "implementation": 5
-    }
-  },
+
   "risk_authority": {
     "low": {
       "plan": "none",
@@ -59,7 +46,7 @@
     },
     "repo-ops.merge-review.v1": {
       "schema": "merge-review.schema.json",
-      "field_order": ["verdict", "risk", "intent", "plan", "plan-round", "implementation-round", "base", "head", "diff", "runtime", "model"]
+      "field_order": ["verdict", "risk", "intent", "plan", "base", "head", "diff", "runtime", "model"]
     },
     "repo-ops.intent.v1": {
       "schema": "intent.schema.json",

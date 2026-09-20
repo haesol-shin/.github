@@ -1,7 +1,7 @@
 contract: repo-ops/v0.1.0
 profile: operations
 quality:
-  check: CI / quality
+  check: quality
   commands:
     - python -m unittest discover -s tests -v
 review:

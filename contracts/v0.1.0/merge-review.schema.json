@@ -4,7 +4,7 @@
   "title": "Exact-head merge review receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["record", "verdict", "risk", "intent", "plan", "plan-round", "implementation-round", "base", "head", "diff", "runtime", "model"],
+  "required": ["record", "verdict", "risk", "intent", "plan", "base", "head", "diff", "runtime", "model"],
   "properties": {
     "record": {
       "const": "repo-ops.merge-review.v1"
@@ -23,14 +23,7 @@
       "type": "string",
       "pattern": "^(sha256:[0-9a-f]{64}|none)$"
     },
-    "plan-round": {
-      "type": "string",
-      "pattern": "^(none|[1-9][0-9]*/[1-9][0-9]*)$"
-    },
-    "implementation-round": {
-      "type": "string",
-      "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"
-    },
+
     "base": {
       "type": "string",
       "pattern": "^[0-9a-f]{40}$"

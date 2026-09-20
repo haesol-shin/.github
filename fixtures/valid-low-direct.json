@@ -3,7 +3,7 @@
     "contract": "repo-ops/v0.1.0",
     "profile": "operations",
     "quality": {
-      "check": "CI / quality",
+      "check": "quality",
       "commands": ["python -m unittest discover -s tests -v"]
     },
     "review": {
@@ -30,14 +30,14 @@
     {
       "author": "maintainer",
       "association": "OWNER",
-      "body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:low intent:none plan:none plan-round:none implementation-round:1/2 base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc runtime:omp/0.1 model:provider/model"
+      "body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:low intent:none plan:none base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc runtime:omp/0.1 model:provider/model"
     }
   ],
   "reviews": [],
   "plan_digest": "none",
   "plan_commits": [],
   "quality": {
-    "name": "CI / quality",
+    "name": "quality",
     "conclusion": "success"
   }
 }
