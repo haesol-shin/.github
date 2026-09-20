@@ -2,6 +2,8 @@
 name: Go validator benchmark
 
 on:
+  pull_request:
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 permissions:
@@ -9,6 +11,7 @@ permissions:
 
 jobs:
   go-clean-ci:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     name: go-clean-ci-${{ matrix.sample }}
     runs-on: ubuntu-latest
     strategy:
