@@ -11,19 +11,11 @@ on:
 permissions: {}
 
 jobs:
-  policy:
-    name: Repository policy / ${{ matrix.name }}
+  contract:
+    name: Repository policy / contract
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: contract
-            check: contract
-          - name: merge approval
-            check: merge-approval
     permissions:
-      checks: read
+      checks: write
       contents: read
       issues: read
       pull-requests: read
@@ -48,6 +40,51 @@ jobs:
           enable-cache: true
           cache-dependency-glob: .repo-ops/actions/repository-policy/uv.lock
       - name: Validate repository contract
+        id: validate
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --check "${{ matrix.check }}"
+        run: uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --check contract
+
+  merge-approval:
+    name: Repository policy / merge approval
+    needs: contract
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Validate immutable contract reference
+        env:
+          CONTRACT_REF: ${{ inputs['contract-ref'] }}
+        run: |
+          [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "contract-ref must be a full commit SHA" >&2
+            exit 1
+          }
+      - name: Fetch trusted validator
+        env:
+          CONTRACT_REF: ${{ inputs['contract-ref'] }}
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
+          git -C .repo-ops checkout --detach "$CONTRACT_REF"
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+        with:
+          enable-cache: true
+          cache-dependency-glob: .repo-ops/actions/repository-policy/uv.lock
+      - name: Validate merge approval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+        run: |
+          set +e
+          uv run --project .repo-ops/actions/repository-policy --locked python .repo-ops/actions/repository-policy/validate.py --event "$GITHUB_EVENT_PATH" --check merge-approval
+          VALIDATOR_RESULT=$?
+          if [[ "$CONTRACT_RESULT" != "success" ]]; then
+            echo "Repository policy / contract did not succeed; merge approval is blocked" >&2
+            exit 1
+          fi
+          exit "$VALIDATOR_RESULT"

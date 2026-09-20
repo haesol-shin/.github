@@ -680,8 +680,6 @@ def validate_state(
     expected_plan = state.get("plan_digest") or "none"
     if risk in {"medium", "high"} and expected_plan == "none":
         errors.append(f"{risk}-risk work requires a current plan")
-    if risk == "low" and expected_plan != "none":
-        errors.append("low-risk direct work must not claim a plan digest")
 
     plan_comments = [
         entry

@@ -11,13 +11,55 @@ on:
 permissions: {}
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    outputs:
+      base-sha: ${{ steps.base.outputs.sha }}
+    steps:
+      - id: base
+        name: Resolve pull request base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ github.event.issue.number }}" --jq .base.sha > base-sha
+          else
+            printf '%s\n' "$DEFAULT_BASE_SHA" > base-sha
+          fi
+          printf 'sha=%s\n' "$(cat base-sha)" >> "$GITHUB_OUTPUT"
   contract:
-    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    needs: prepare
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        (
+          contains(github.event.comment.body, 'repo-ops.plan-approval.v1') ||
+          contains(github.event.comment.body, 'repo-ops.merge-review.v1') ||
+          contains(github.event.changes.body.from, 'repo-ops.plan-approval.v1') ||
+          contains(github.event.changes.body.from, 'repo-ops.merge-review.v1')
+        )
+      ) ||
+      (
+        github.event_name == 'pull_request_review' &&
+        (
+          contains(github.event.review.body, 'repo-ops.plan-approval.v1') ||
+          contains(github.event.review.body, 'repo-ops.merge-review.v1') ||
+          contains(github.event.changes.body.from, 'repo-ops.plan-approval.v1') ||
+          contains(github.event.changes.body.from, 'repo-ops.merge-review.v1')
+        )
+      )
     uses: ./.github/workflows/repository-policy.yml
     permissions:
-      checks: read
+      checks: write
       contents: read
       issues: read
       pull-requests: read
     with:
-      contract-ref: ${{ github.event.pull_request.base.sha || github.sha }}
+      contract-ref: ${{ needs.prepare.outputs.base-sha }}

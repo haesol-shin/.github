@@ -322,6 +322,18 @@ class ValidatorConformanceTests(unittest.TestCase):
     def test_valid_low_direct_route(self) -> None:
         self.assertEqual([], self.findings("valid-low-direct.json"))
 
+    def test_low_risk_plan_is_optional_authority(self) -> None:
+        state, _ = validator.load_fixture(self.fixtures / "valid-low-direct.json")
+        digest = "sha256:" + "d" * 64
+        state["plan_digest"] = digest
+        state["comments"][0]["body"] = state["comments"][0]["body"].replace(
+            "plan:none",
+            f"plan:{digest}",
+            1,
+        )
+        self.assertEqual([], validator.validate_state(state, self.contract_root))
+
+
     def test_folding_is_stable_duplicate_safe_and_consumes_only_fragments(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -549,9 +561,16 @@ class ValidatorConformanceTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "repository-policy.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("Repository policy / ${{ matrix.name }}", workflow)
-        self.assertIn("check: contract", workflow)
-        self.assertIn("check: merge-approval", workflow)
+        self.assertIn("name: Repository policy / contract", workflow)
+        self.assertIn("name: Repository policy / merge approval", workflow)
+        self.assertIn("needs: contract", workflow)
+        self.assertIn("if: ${{ always() }}", workflow)
+        policy_workflow = (ROOT / ".github" / "workflows" / "policy.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("checks: write", policy_workflow)
+        self.assertIn("repo-ops.plan-approval.v1", policy_workflow)
+        self.assertIn("repo-ops.merge-review.v1", policy_workflow)
 
     def test_record_rejects_noncanonical_spacing(self) -> None:
         record, error = validator.parse_record_line(
