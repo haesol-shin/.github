@@ -74,21 +74,33 @@ jobs:
           [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
           printf 'base-sha=%s\n' "$base_sha" >> "$GITHUB_OUTPUT"
           printf 'head-sha=%s\n' "$head_sha" >> "$GITHUB_OUTPUT"
-      - name: Revoke stale exact-head results
+      - id: authorize
+        name: Authorize live policy publication
         env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
           EVENT_NAME: ${{ github.event_name }}
           AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association || github.event.review.author_association }}
           AUTHOR_LOGIN: ${{ github.event.comment.user.login || github.event.review.user.login }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ "$EVENT_NAME" != "pull_request_target" && "$AUTHOR_ASSOCIATION" != "OWNER" ]]; then
-            permission="$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${AUTHOR_LOGIN}/permission" --jq .permission 2>/dev/null || true)"
-            case "$permission" in
-              maintain|admin) ;;
-              *) exit 0 ;;
-            esac
+          if [[ "$EVENT_NAME" == "pull_request_target" || "$AUTHOR_ASSOCIATION" == "OWNER" ]]; then
+            printf 'authorized=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          permission="$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${AUTHOR_LOGIN}/permission" --jq .permission 2>/dev/null || true)"
+          case "$permission" in
+            maintain|admin)
+              printf 'authorized=true\n' >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              printf 'authorized=false\n' >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+      - name: Revoke stale exact-head results
+        if: steps.authorize.outputs.authorized == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
+        run: |
           for check_name in "contract" "merge approval"; do
             gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
               -f "name=${check_name}" \
@@ -99,6 +111,7 @@ jobs:
               -f "output[summary]=Previous policy result revoked before candidate validation."
           done
       - name: Validate immutable contract reference
+        if: steps.authorize.outputs.authorized == 'true'
         env:
           CONTRACT_REF: ${{ steps.resolve.outputs.base-sha }}
         run: |
@@ -107,12 +120,14 @@ jobs:
             exit 1
           }
       - name: Fetch trusted validator
+        if: steps.authorize.outputs.authorized == 'true'
         env:
           CONTRACT_REF: ${{ steps.resolve.outputs.base-sha }}
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
           git -C .repo-ops checkout --detach "$CONTRACT_REF"
       - name: Validate repository contract
+        if: steps.authorize.outputs.authorized == 'true'
         id: contract
         continue-on-error: true
         uses: ./.repo-ops/actions/repository-policy
@@ -120,6 +135,7 @@ jobs:
           github-token: ${{ github.token }}
           check: contract
       - name: Validate merge approval
+        if: steps.authorize.outputs.authorized == 'true'
         id: merge
         continue-on-error: true
         uses: ./.repo-ops/actions/repository-policy
@@ -127,7 +143,7 @@ jobs:
           github-token: ${{ github.token }}
           check: merge-approval
       - name: Publish exact-head policy checks
-        if: always() && steps.resolve.outputs.head-sha
+        if: always() && steps.authorize.outputs.authorized == 'true' && steps.resolve.outputs.head-sha
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}

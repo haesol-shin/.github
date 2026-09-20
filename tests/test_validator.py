@@ -646,6 +646,30 @@ class ValidatorConformanceTests(unittest.TestCase):
         self.assertIn('-f "head_sha=${HEAD_SHA}"', policy_workflow)
         self.assertNotIn("plan-round", (self.contract_root / "merge-review.schema.json").read_text(encoding="utf-8"))
         self.assertNotIn("round_limits", validator.json.dumps(validator.CONTRACT))
+        parsed_policy = validator.yaml.safe_load(policy_workflow)
+        publish_steps = parsed_policy["jobs"]["publish"]["steps"]
+        authorize = next(step for step in publish_steps if step.get("id") == "authorize")
+        self.assertIn("authorized=true", authorize["run"])
+        self.assertIn("authorized=false", authorize["run"])
+        seen_authorize = False
+        for step in publish_steps:
+            if step.get("id") == "authorize":
+                seen_authorize = True
+                continue
+            if not seen_authorize:
+                continue
+            self.assertIn(
+                "steps.authorize.outputs.authorized == 'true'",
+                str(step.get("if", "")),
+            )
+        publish = next(
+            step for step in publish_steps if step.get("name") == "Publish exact-head policy checks"
+        )
+        self.assertIn("always()", str(publish["if"]))
+        intent = parsed_policy["jobs"]["intent-revocation"]
+        self.assertNotIn("authorize", validator.yaml.dump(intent))
+        self.assertIn("exit 0", intent["steps"][0]["run"])
+
 
     def test_composite_action_manifest_loads_as_typed_yaml(self) -> None:
         path = ROOT / "actions" / "repository-policy" / "action.yml"
