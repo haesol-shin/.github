@@ -30,7 +30,6 @@
     {
       "author": "maintainer",
       "association": "OWNER",
-      "permission": "admin",
       "body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:low intent:none plan:none plan-round:none implementation-round:1/2 base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc runtime:omp/0.1 model:provider/model"
     }
   ],

@@ -608,19 +608,25 @@ class ValidatorConformanceTests(unittest.TestCase):
         policy_workflow = (ROOT / ".github" / "workflows" / "policy.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("name: Repository policy / contract", policy_workflow)
-        self.assertIn("name: Repository policy / merge approval", policy_workflow)
+        self.assertIn("name: contract", policy_workflow)
+        self.assertIn("name: merge approval", policy_workflow)
+        self.assertIn('-f "name=Repository policy / contract"', policy_workflow)
+        self.assertIn('-f "name=Repository policy / merge approval"', policy_workflow)
         self.assertIn("uses: ./.repo-ops/actions/repository-policy", policy_workflow)
         self.assertNotIn("uses: ./.github/workflows/repository-policy.yml", policy_workflow)
         self.assertIn("repo-ops.intent.v1", policy_workflow)
         self.assertIn("checks: write", policy_workflow)
+        self.assertNotIn("needs: prepare", policy_workflow)
+        self.assertNotIn("needs: revoke", policy_workflow)
+        self.assertIn("needs: contract", policy_workflow)
+        self.assertNotIn("/issues/${ISSUE_NUMBER}/pulls", policy_workflow)
+        self.assertIn("/pulls?state=open&per_page=100", policy_workflow)
         quality_workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
             encoding="utf-8"
         )
         self.assertIn("  quality:\n    name: quality", quality_workflow)
         self.assertIn('-f "head_sha=${HEAD_SHA}"', policy_workflow)
         self.assertIn('-f "conclusion=${conclusion}"', policy_workflow)
-        self.assertIn("needs.revoke.result == 'success'", policy_workflow)
 
     def test_record_rejects_noncanonical_spacing(self) -> None:
         record, error = validator.parse_record_line(

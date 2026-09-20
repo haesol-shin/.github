@@ -11,37 +11,8 @@ on:
 permissions: {}
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-      contents: read
-    outputs:
-      base-sha: ${{ steps.base.outputs.base-sha }}
-      head-sha: ${{ steps.base.outputs.head-sha }}
-    steps:
-      - id: base
-        name: Resolve pull request base and head
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DEFAULT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
-          DEFAULT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          if [[ "$EVENT_NAME" == "issue_comment" ]] &&
-            jq -e '.issue.pull_request != null' "$GITHUB_EVENT_PATH" >/dev/null; then
-            gh api "repos/${GITHUB_REPOSITORY}/pulls/$(jq -r .issue.number "$GITHUB_EVENT_PATH")" > pull-request.json
-            jq -r .base.sha pull-request.json > base-sha
-            jq -r .head.sha pull-request.json > head-sha
-          else
-            printf '%s\n' "$DEFAULT_BASE_SHA" > base-sha
-            printf '%s\n' "$DEFAULT_HEAD_SHA" > head-sha
-          fi
-          printf 'base-sha=%s\n' "$(cat base-sha)" >> "$GITHUB_OUTPUT"
-          printf 'head-sha=%s\n' "$(cat head-sha)" >> "$GITHUB_OUTPUT"
-
-  revoke:
-    needs: prepare
+  contract:
+    name: contract
     if: >-
       github.event_name == 'pull_request_target' ||
       (
@@ -74,14 +45,53 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    outputs:
+      base-sha: ${{ steps.resolve.outputs.base-sha }}
+      head-sha: ${{ steps.resolve.outputs.head-sha }}
     permissions:
       checks: write
+      contents: read
+      issues: read
+      pull-requests: read
     steps:
+      - id: resolve
+        name: Resolve immutable base and exact head
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          DEFAULT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$EVENT_NAME" == "issue_comment" ]] &&
+            jq -e '.issue.pull_request != null' "$GITHUB_EVENT_PATH" >/dev/null; then
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/$(jq -r .issue.number "$GITHUB_EVENT_PATH")" > pull-request.json
+            jq -r .base.sha pull-request.json > base-sha
+            jq -r .head.sha pull-request.json > head-sha
+          else
+            printf '%s\n' "$DEFAULT_BASE_SHA" > base-sha
+            printf '%s\n' "$DEFAULT_HEAD_SHA" > head-sha
+          fi
+          base_sha="$(cat base-sha)"
+          head_sha="$(cat head-sha)"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          printf 'base-sha=%s\n' "$base_sha" >> "$GITHUB_OUTPUT"
+          printf 'head-sha=%s\n' "$head_sha" >> "$GITHUB_OUTPUT"
       - name: Revoke stale exact-head results
         env:
           GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association || github.event.review.author_association }}
+          AUTHOR_LOGIN: ${{ github.event.comment.user.login || github.event.review.user.login }}
         run: |
+          if [[ "$EVENT_NAME" != "pull_request_target" && "$AUTHOR_ASSOCIATION" != "OWNER" ]]; then
+            permission="$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${AUTHOR_LOGIN}/permission" --jq .permission 2>/dev/null || true)"
+            case "$permission" in
+              maintain|admin) ;;
+              *) exit 0 ;;
+            esac
+          fi
           for check_name in "Repository policy / contract" "Repository policy / merge approval"; do
             gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
               -f "name=${check_name}" \
@@ -91,24 +101,9 @@ jobs:
               -f "output[title]=Validation pending" \
               -f "output[summary]=Previous policy result revoked before candidate validation."
           done
-
-  contract:
-    name: Repository policy / contract
-    needs: [prepare, revoke]
-    if: >-
-      always() && (
-        needs.revoke.result == 'success'
-      )
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write
-      contents: read
-      issues: read
-      pull-requests: read
-    steps:
       - name: Validate immutable contract reference
         env:
-          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+          CONTRACT_REF: ${{ steps.resolve.outputs.base-sha }}
         run: |
           [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
             echo "contract-ref must be a full commit SHA" >&2
@@ -116,7 +111,7 @@ jobs:
           }
       - name: Fetch trusted validator
         env:
-          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+          CONTRACT_REF: ${{ steps.resolve.outputs.base-sha }}
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
           git -C .repo-ops checkout --detach "$CONTRACT_REF"
@@ -131,7 +126,7 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
           VALIDATOR_OUTCOME: ${{ steps.validate.outcome }}
         run: |
           if [[ "$VALIDATOR_OUTCOME" == "success" ]]; then
@@ -149,11 +144,10 @@ jobs:
           [[ "$VALIDATOR_OUTCOME" == "success" ]]
 
   merge-approval:
-    name: Repository policy / merge approval
-    needs: [prepare, revoke, contract]
+    name: merge approval
+    needs: contract
     if: >-
       always() &&
-      needs.revoke.result == 'success' &&
       (
         github.event_name == 'pull_request_target' ||
         (
@@ -193,9 +187,35 @@ jobs:
       issues: read
       pull-requests: read
     steps:
+      - id: resolve
+        name: Re-resolve exact head
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          DEFAULT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CONTRACT_BASE_SHA: ${{ needs.contract.outputs.base-sha }}
+          CONTRACT_HEAD_SHA: ${{ needs.contract.outputs.head-sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$CONTRACT_BASE_SHA" =~ ^[0-9a-f]{40}$ && "$CONTRACT_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            base_sha="$CONTRACT_BASE_SHA"
+            head_sha="$CONTRACT_HEAD_SHA"
+          elif [[ "$EVENT_NAME" == "issue_comment" ]] &&
+            jq -e '.issue.pull_request != null' "$GITHUB_EVENT_PATH" >/dev/null; then
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/$(jq -r .issue.number "$GITHUB_EVENT_PATH")" > pull-request.json
+            base_sha="$(jq -r .base.sha pull-request.json)"
+            head_sha="$(jq -r .head.sha pull-request.json)"
+          else
+            base_sha="$DEFAULT_BASE_SHA"
+            head_sha="$DEFAULT_HEAD_SHA"
+          fi
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          printf 'base-sha=%s\n' "$base_sha" >> "$GITHUB_OUTPUT"
+          printf 'head-sha=%s\n' "$head_sha" >> "$GITHUB_OUTPUT"
       - name: Validate immutable contract reference
         env:
-          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+          CONTRACT_REF: ${{ steps.resolve.outputs.base-sha }}
         run: |
           [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
             echo "contract-ref must be a full commit SHA" >&2
@@ -203,7 +223,7 @@ jobs:
           }
       - name: Fetch trusted validator
         env:
-          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+          CONTRACT_REF: ${{ steps.resolve.outputs.base-sha }}
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
           git -C .repo-ops checkout --detach "$CONTRACT_REF"
@@ -218,12 +238,11 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          HEAD_SHA: ${{ steps.resolve.outputs.head-sha }}
           CONTRACT_RESULT: ${{ needs.contract.result }}
-          REVOKE_RESULT: ${{ needs.revoke.result }}
           VALIDATOR_OUTCOME: ${{ steps.validate.outcome }}
         run: |
-          if [[ "$CONTRACT_RESULT" == "success" && "$REVOKE_RESULT" == "success" && "$VALIDATOR_OUTCOME" == "success" ]]; then
+          if [[ "$CONTRACT_RESULT" == "success" && "$VALIDATOR_OUTCOME" == "success" ]]; then
             conclusion=success
           else
             conclusion=failure
@@ -238,7 +257,6 @@ jobs:
           [[ "$conclusion" == "success" ]]
 
   intent-revocation:
-    needs: prepare
     if: >-
       github.event_name == 'issue_comment' &&
       !github.event.issue.pull_request &&
@@ -254,24 +272,35 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       checks: write
+      contents: read
       issues: read
       pull-requests: read
     steps:
-      - name: Revoke checks for open pull requests linked to the Issue
+      - name: Revoke checks for linked open pull requests
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+          AUTHOR_LOGIN: ${{ github.event.comment.user.login }}
         run: |
           set -euo pipefail
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/pulls?state=open&per_page=100" --jq '.[].number' |
-          while read -r pull_number; do
-            pull_request="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pull_number}")"
-            body="$(jq -r '.body // ""' <<<"$pull_request")"
+          if [[ "$AUTHOR_ASSOCIATION" != "OWNER" ]]; then
+            permission="$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${AUTHOR_LOGIN}/permission" --jq .permission 2>/dev/null || true)"
+            case "$permission" in
+              maintain|admin) ;;
+              *) exit 0 ;;
+            esac
+          fi
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '.[] | [.number, .head.sha, (.body // "")] | @json' |
+          while IFS= read -r pull_json; do
+            [[ -n "$pull_json" ]] || continue
+            body="$(jq -r '.[2]' <<<"$pull_json")"
             if ! jq -nr --arg body "$body" --arg issue "$ISSUE_NUMBER" \
-              '$body | test("(?m)^(Fixes|Closes|Related)[[:space:]]+#" + $issue + "$")'; then
+              '$body | test("(?im)^(Fixes|Closes|Related)[[:space:]]+#" + $issue + "[[:space:]]*$")'; then
               continue
             fi
-            head_sha="$(jq -r '.head.sha' <<<"$pull_request")"
+            head_sha="$(jq -r '.[1]' <<<"$pull_json")"
             for check_name in "Repository policy / contract" "Repository policy / merge approval"; do
               gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
                 -f "name=${check_name}" \

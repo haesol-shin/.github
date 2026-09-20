@@ -604,10 +604,13 @@ def latest_record(
     found: list[tuple[dict[str, Any], dict[str, Any]]] = []
     errors: list[str] = []
     for entry in entries:
+        body = entry.get("body") or ""
+        if record not in body:
+            continue
         if record == "repo-ops.plan-approval.v1":
-            parsed, error = parse_plan_approval(entry.get("body") or "")
+            parsed, error = parse_plan_approval(body)
         else:
-            parsed, error = parse_record_line(entry.get("body") or "", record)
+            parsed, error = parse_record_line(body, record)
         if error:
             errors.append(error)
         elif parsed:
