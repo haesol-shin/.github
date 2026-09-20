@@ -1,71 +1,83 @@
 {
   "oracle_commit": "654d81f68ee1db5baf33c89016d3ddb659e98220",
-  "go_commit": "7348602312ed69f74f90dbe61097854a823e5739",
+  "go_commit": "c9eb040b5278cc7646721ddc9d29afe860c39f82",
   "local_cold_start_ms": {
     "python": {
       "samples": [
-        249,
-        282,
-        270,
-        273,
-        323
+        269,
+        255,
+        246,
+        258,
+        259
       ],
-      "p50": 273,
-      "p95": 323,
+      "p50": 258,
+      "p95": 269,
       "n": 5
     },
     "go": {
       "samples": [
         20,
-        23,
-        20,
-        20,
-        23
+        21,
+        21,
+        21,
+        21
       ],
-      "p50": 20,
-      "p95": 23,
+      "p50": 21,
+      "p95": 21,
       "n": 5
     }
   },
   "clean_ci_wall_ms": {
     "python": {
-      "samples": [],
-      "p50": 0,
-      "p95": 0,
-      "n": 0,
-      "source": "production quality job"
+      "samples": [
+        6000,
+        8000,
+        9000,
+        9000,
+        8000
+      ],
+      "p50": 8000,
+      "p95": 9000,
+      "n": 5,
+      "source": "production quality run 35538127563 attempts 2-6; jobs 106151095711, 106151567590, 106151614163, 106151660426, 106151710741"
     },
     "go": {
-      "samples": [],
-      "p50": 0,
-      "p95": 0,
-      "n": 0,
-      "source": "5-go-validator-benchmark.yml"
+      "samples": [
+        24000,
+        28000,
+        23000,
+        27000,
+        23000
+      ],
+      "p50": 24000,
+      "p95": 28000,
+      "n": 5,
+      "source": "5-go-validator-benchmark.yml run 35538676994; jobs 106152237697, 106152237656, 106152237667, 106152237635, 106152237647"
     }
   },
   "peak_rss_kib": {
     "python": {
       "samples": [
-        58540,
-        58784,
-        58792,
-        58496,
-        58676
+        57444,
+        57564,
+        57208,
+        57544,
+        57560
       ],
-      "p50": 58676,
-      "p95": 58792,
+      "p50": 57544,
+      "p95": 57564,
       "n": 5
     },
     "go": {
       "samples": [
-        9564,
-        9560,
-        9524,
-        9544,
-        9536
+        9152,
+        9236,
+        7020,
+        9420,
+        7584
       ],
-      "p50": 9544,
-      "p95": 9564,
+      "p50": 9152,
+      "p95": 9420,
       "n": 5
     }
   },
@@ -86,14 +98,15 @@
   "explanations": [
     "Percentiles use nearest-rank ceil(p*n) on the sorted samples, 1-based, clamped to [1, n].",
     "local_cold_start_ms is wall time of a fresh process `--fixture fixtures/valid-high.json --check all` after one discarded warmup per language. Go is a CGO_ENABLED=0 prebuilt binary; Python is `uv run --project actions/repository-policy --locked python actions/repository-policy/validate.py`. Compiler/uv bootstrap time is excluded.",
-    "peak_rss_kib is process-tree peak working set in KiB. Windows holds process handles and sums PeakWorkingSetSize; Linux uses VmHWM; macOS uses ps rss. This is not ru_maxrss and is not comparable to GitHub runner memory.",
+    "peak_rss_kib is the maximum sampled aggregate current resident set of the process tree in KiB. Windows uses WorkingSetSize while retaining child handles; Linux uses VmRSS; macOS enumerates descendants from ps pid/ppid/rss. This is not ru_maxrss and is not comparable to GitHub runner memory.",
     "Local host: Windows-11-10.0.26200-SP0 python=3.12.10 go=go version go1.27.1 windows/amd64 uv=uv 0.11.18 (e32666915 2026-06-01 x86_64-pc-windows-msvc). OS file cache was not dropped.",
     "Local Windows/macOS numbers are not GitHub ubuntu-latest clean-CI samples.",
-    "clean_ci_wall_ms.python is pending: requires n>=5 empty-cache production `quality` job durations after this branch is on GitHub. Not fabricated.",
-    "clean_ci_wall_ms.go is pending: requires n>=5 empty-cache runs of `.github/workflows/5-go-validator-benchmark.yml` (`go test ./...`). Local `go test ./...` is not a clean-CI sample. Not fabricated.",
+    "clean_ci_wall_ms.python is the GitHub job duration for production `quality` run 35538127563 attempts 2-6. Before every rerun, the single matching `setup-uv` cache was deleted; every attempt logged `No GitHub Actions cache found for key`. GitHub job timestamps have one-second resolution.",
+    "clean_ci_wall_ms.go is the GitHub job duration for the five empty-cache matrix jobs in isolated run 35538676994. The workflow disables setup-go caching, assigns a unique empty GOMODCACHE and GOCACHE to every sample, checks out the recorded head explicitly, and uploads the measured head plus inner-command timing. GitHub job timestamps have one-second resolution.",
     "workflow_steps counts explicit `.github/workflows/policy.yml` job `publish` steps in the Stage 2 tree (8). Proposed Stage 3 keeps those 8 steps and swaps composite internals to build+exec the base-owned Go binary with the same `--event`/`--check` flags. The benchmark-only job is not counted.",
     "production_dependencies.python are the plan's trusted-path entries. production_dependencies.go lists direct require directives in go.mod only (not test-only or benchmark tooling). Current inventory: gopkg.in/yaml.v3@v3.0.1.",
-    "go_commit is HEAD 7348602312ed69f74f90dbe61097854a823e5739; worktree had uncommitted Stage 2 files during measurement.",
+    "go_commit is the exact measured workflow head c9eb040b5278cc7646721ddc9d29afe860c39f82.",
+    "Go clean-CI p95 is 28000 ms versus Python's 9000 ms. The isolated Go job includes checkout, setup-go, downloading gopkg.in/yaml.v3 into an empty module cache, compiling every package into an empty build cache, and artifact upload; this measured regression is advisory and does not retain Python after Stage 3.",
     "Benchmarks are evidence only and do not authorize retaining Python after Stage 3."
   ]
 }

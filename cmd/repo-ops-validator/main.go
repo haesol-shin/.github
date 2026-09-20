@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/haesol-shin/.github/internal/collect"
 	"github.com/haesol-shin/.github/internal/evaluate"
@@ -19,6 +20,8 @@ const (
 	mergeApprovalBlocked     = "contract check did not succeed; merge approval is blocked"
 	exactlyOneSourceRequired = "exactly one of --fixture or --event is required"
 	contractMarker           = "contracts/v0.1.0/contract.json"
+	contractRootEnv          = "REPO_OPS_CONTRACT_ROOT"
+	liveCollectionTimeout    = 2 * time.Minute
 )
 
 // liveStateFunc loads evaluator state from a GitHub event path. Production uses
@@ -30,8 +33,10 @@ func main() {
 }
 
 func defaultLiveState(eventPath string, getenv func(string) string) (map[string]any, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), liveCollectionTimeout)
+	defer cancel()
 	return collect.BuildLiveState(
-		context.Background(),
+		ctx,
 		eventPath,
 		getenv,
 		collect.NewGitHubClient(getenv("GITHUB_TOKEN"), getenv("GITHUB_API_URL"), nil),
@@ -78,7 +83,7 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string, li
 	if hasEvent {
 		hint = *eventPath
 	}
-	root, err := findRepoRoot(hint)
+	root, err := findRepoRoot(hint, hasEvent, getenv)
 	if err != nil {
 		return emitFindings(stdout, getenv, []string{err.Error()}, *checkName)
 	}
@@ -143,16 +148,29 @@ func emitFindings(stdout io.Writer, getenv func(string) string, findings []strin
 	return 1
 }
 
-func findRepoRoot(hint string) (string, error) {
+func findRepoRoot(hint string, event bool, getenv func(string) string) (string, error) {
 	var starts []string
-	if wd, err := os.Getwd(); err == nil {
-		starts = append(starts, wd)
-	}
-	if hint != "" {
-		starts = append(starts, filepath.Dir(hint))
-	}
-	if exe, err := os.Executable(); err == nil {
-		starts = append(starts, filepath.Dir(exe))
+	if event {
+		if explicit := strings.TrimSpace(getenv(contractRootEnv)); explicit != "" {
+			root := filepath.Clean(explicit)
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(contractMarker))); err != nil {
+				return "", fmt.Errorf("%s does not contain %s", contractRootEnv, contractMarker)
+			}
+			return root, nil
+		}
+		if exe, err := os.Executable(); err == nil {
+			starts = append(starts, filepath.Dir(exe))
+		}
+	} else {
+		if wd, err := os.Getwd(); err == nil {
+			starts = append(starts, wd)
+		}
+		if hint != "" {
+			starts = append(starts, filepath.Dir(hint))
+		}
+		if exe, err := os.Executable(); err == nil {
+			starts = append(starts, filepath.Dir(exe))
+		}
 	}
 	seen := map[string]struct{}{}
 	for _, start := range starts {
@@ -172,5 +190,5 @@ func findRepoRoot(hint string) (string, error) {
 			dir = parent
 		}
 	}
-	return "", fmt.Errorf("repository root with %s not found", contractMarker)
+	return "", fmt.Errorf("trusted repository root with %s not found; set %s", contractMarker, contractRootEnv)
 }

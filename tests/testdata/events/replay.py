@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Stage 2 validator replay: local HTTP + local git, Python/Go CLI matrix.
 
-Does not call live GitHub or the caller's working tree as a git remote.
-Does not load tests/testdata/events/workflow bundles.
+Committed expected rows are independently reviewed contract evidence; this
+harness can verify but cannot regenerate them from either implementation.
+Candidate implementations execute as native code, so the explicit trust flag
+is required and untrusted pull requests must run only in a disposable sandbox.
+The matrix does not call live GitHub or use the caller's working tree as a git
+remote, and it does not load tests/testdata/events/workflow bundles.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -38,6 +43,26 @@ CLONE_MARKERS = (
     "git://github.com/haesol-shin/.github.git",
 )
 HEAD_EXEC_MARKERS = ("HEAD_CODE_EXECUTED", "untrusted-quality")
+PASSTHROUGH_ENV = (
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "HOME",
+    "USERPROFILE",
+    "LOCALAPPDATA",
+    "APPDATA",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "GOROOT",
+    "GOMODCACHE",
+    "UV_CACHE_DIR",
+    "UV_PYTHON_INSTALL_DIR",
+)
 DIFF_GIT = [
     "git",
     "-c",
@@ -215,11 +240,16 @@ def start_http(
 
 
 def git_run(args: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
-    merged = os.environ.copy()
+    merged = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("GIT_CONFIG_")
+    }
     if env:
         merged.update(env)
-    merged.setdefault("GIT_CONFIG_NOSYSTEM", "1")
-    merged.setdefault("GIT_TERMINAL_PROMPT", "0")
+    merged["GIT_CONFIG_NOSYSTEM"] = "1"
+    merged["GIT_CONFIG_GLOBAL"] = os.devnull
+    merged["GIT_TERMINAL_PROMPT"] = "0"
     return subprocess.run(args, cwd=cwd, env=merged, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
 
@@ -280,6 +310,38 @@ def independent_diff_digest(remote: Path, base: str, head: str, pull_number: int
         shutil.rmtree(work, ignore_errors=True)
 
 
+def independent_plan_digest(recordings: list[dict[str, Any]], head: str) -> str:
+    candidates: list[str] = []
+    for recording in recordings:
+        if str(recording.get("method", "")).upper() != "GET":
+            continue
+        parsed = urlparse(str(recording.get("url", "")))
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        body = recording.get("body")
+        if (
+            query.get("ref") != head
+            or not isinstance(body, dict)
+            or not str(body.get("path", "")).startswith(".ops/plans/")
+            or body.get("encoding") != "base64"
+        ):
+            continue
+        encoded = body.get("content")
+        if not isinstance(encoded, str):
+            raise SystemExit("recorded plan content is not base64 text")
+        compact = "".join(encoded.split())
+        candidates.append(base64.b64decode(compact, validate=True).decode("utf-8"))
+    if len(candidates) != 1:
+        raise SystemExit(f"expected one recorded head plan, found {len(candidates)}")
+    normalized = candidates[0].replace("\r\n", "\n").replace("\r", "\n").rstrip() + "\n"
+    canonical = json.dumps(
+        {"text": normalized},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(canonical).hexdigest()}"
+
+
 def rewrite_event(event: Any, *, origin: str, clone_url: str) -> Any:
     if isinstance(event, dict):
         return {key: rewrite_event(value, origin=origin, clone_url=clone_url) for key, value in event.items()}
@@ -301,13 +363,25 @@ def load_git_meta(bundle: Path) -> dict[str, Any]:
 
 
 def child_env(origin: str, summary: Path | None = None) -> dict[str, str]:
-    env = os.environ.copy()
+    env = {
+        key: value
+        for key in PASSTHROUGH_ENV
+        if (value := os.environ.get(key))
+    }
     env["GITHUB_TOKEN"] = SECRET_VALUE
     env["GITHUB_API_URL"] = origin
     env["GITHUB_REPOSITORY"] = "haesol-shin/.github"
+    env["REPO_OPS_CONTRACT_ROOT"] = str(ROOT)
     env["CGO_ENABLED"] = "0"
+    env["GOPROXY"] = "off"
+    env["UV_OFFLINE"] = "1"
+    env["HTTP_PROXY"] = "http://127.0.0.1:9"
+    env["HTTPS_PROXY"] = "http://127.0.0.1:9"
+    env["ALL_PROXY"] = "http://127.0.0.1:9"
+    env["NO_PROXY"] = "127.0.0.1,localhost"
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env["GIT_CONFIG_GLOBAL"] = os.devnull
     if summary is not None:
         env["GITHUB_STEP_SUMMARY"] = str(summary)
     else:
@@ -384,7 +458,6 @@ def run_bundle(
     *,
     impls: tuple[str, ...],
     out: Path,
-    write_expected: bool,
 ) -> list[str]:
     errors: list[str] = []
     event = json.loads((bundle / "webhook.json").read_text(encoding="utf-8"))
@@ -393,7 +466,7 @@ def run_bundle(
     pull_number = int(meta["pull_number"])
     base_sha = str(meta["base"])
     head_sha = str(meta["head"])
-    plan_digest = str(meta["plan_digest"])
+    plan_digest = independent_plan_digest(recordings, head_sha)
     work = Path(tempfile.mkdtemp(prefix="repo-ops-replay-"))
     server = None
     try:
@@ -403,6 +476,9 @@ def run_bundle(
         expected_diff = str(meta["diff_digest"])
         if hashed != expected_diff:
             errors.append(f"{bundle.name} independent diff_digest {hashed} != {expected_diff}")
+        expected_plan = str(meta["plan_digest"])
+        if plan_digest != expected_plan:
+            errors.append(f"{bundle.name} independent plan_digest {plan_digest} != {expected_plan}")
         clone_url = str(remote)
         server, _index, seen, unmatched = start_http(recordings, clone_url=clone_url)
         origin = f"http://127.0.0.1:{server.server_address[1]}"
@@ -434,11 +510,7 @@ def run_bundle(
             errors.append(f"{bundle.name} unmatched HTTP: {unmatched}")
         del seen
         expected_path = bundle / "expected.json"
-        if write_expected:
-            write_json(expected_path, observed["python"])
-            committed = observed["python"]
-        else:
-            committed = json.loads(expected_path.read_text(encoding="utf-8"))
+        committed = json.loads(expected_path.read_text(encoding="utf-8"))
         for check in CHECKS:
             gold = committed[check]
             for impl in impls:
@@ -458,10 +530,16 @@ def run_bundle(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Stage 2 validator event replay")
     parser.add_argument("--out", type=Path, default=EVENTS / "observed")
-    parser.add_argument("--write-expected", action="store_true")
     parser.add_argument("--impls", default="python,go")
     parser.add_argument("--bundle", action="append", default=[])
+    parser.add_argument(
+        "--trusted-candidate",
+        action="store_true",
+        help="acknowledge that candidate Python/Go code will execute natively",
+    )
     args = parser.parse_args()
+    if not args.trusted_candidate:
+        parser.error("--trusted-candidate is required; sandbox untrusted pull requests")
     impls = tuple(name.strip() for name in args.impls.split(",") if name.strip())
     args.out.mkdir(parents=True, exist_ok=True)
     selected = bundle_dirs()
@@ -477,7 +555,6 @@ def main() -> int:
                 bundle,
                 impls=impls,
                 out=args.out,
-                write_expected=args.write_expected,
             )
         )
     if errors:

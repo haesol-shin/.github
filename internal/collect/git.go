@@ -47,7 +47,7 @@ func GitMetadata(ctx context.Context, pullRequest map[string]any, token, mergeBa
 		return "", "", err
 	}
 	refspec := "refs/pull/" + strconv.Itoa(number) + "/head:refs/repo-ops/head"
-	if err := runGit(ctx, directory, env, "fetch", "--quiet", "--no-tags", cloneURL, refspec); err != nil {
+	if err := runGit(ctx, directory, env, "fetch", "--quiet", "--no-tags", "--depth=1", cloneURL, refspec); err != nil {
 		return "", "", err
 	}
 	fetched, err := gitOutput(ctx, directory, env, "rev-parse", "refs/repo-ops/head")
@@ -58,7 +58,10 @@ func GitMetadata(ctx context.Context, pullRequest map[string]any, token, mergeBa
 		return "", "", fmt.Errorf("fetched pull request head does not match the GitHub API")
 	}
 	if err := runGit(ctx, directory, env, "cat-file", "-e", mergeBase+"^{commit}"); err != nil {
-		return "", "", err
+		baseRefspec := mergeBase + ":refs/repo-ops/base"
+		if err := runGit(ctx, directory, env, "fetch", "--quiet", "--no-tags", "--depth=1", cloneURL, baseRefspec); err != nil {
+			return "", "", err
+		}
 	}
 	if err := runGit(ctx, directory, env, "update-ref", "refs/repo-ops/base", mergeBase); err != nil {
 		return "", "", err

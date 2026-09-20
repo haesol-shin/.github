@@ -179,13 +179,36 @@ func TestEventMergeApprovalBlockedWhenContractFails(t *testing.T) {
 	}
 }
 
+func TestEventRootRequiresTrustedLocation(t *testing.T) {
+	t.Parallel()
+	if _, err := findRepoRoot("event.json", true, func(string) string { return "" }); err == nil {
+		t.Fatal("event root trusted the ambient working directory")
+	}
+	root, err := findRepoRoot("event.json", true, func(key string) string {
+		if key == contractRootEnv {
+			return testRepoRoot()
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root != testRepoRoot() {
+		t.Fatalf("root = %q, want %q", root, testRepoRoot())
+	}
+}
+
 func fixturePath(t *testing.T, name string) string {
 	t.Helper()
+	return filepath.Join(testRepoRoot(), "fixtures", name)
+}
+
+func testRepoRoot() string {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
-		t.Fatal("runtime.Caller failed")
+		panic("runtime.Caller failed")
 	}
-	return filepath.Join(filepath.Dir(file), "..", "..", "fixtures", name)
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 }
 
 func parseAnnotations(stdout string) []string {
@@ -210,6 +233,12 @@ func captureLive(args []string, live liveStateFunc) (string, string, int) {
 
 func captureLiveEnv(args []string, getenv func(string) string, live liveStateFunc) (string, string, int) {
 	var stdout, stderr bytes.Buffer
-	code := run(args, &stdout, &stderr, getenv, live)
+	trustedEnv := func(key string) string {
+		if key == contractRootEnv {
+			return testRepoRoot()
+		}
+		return getenv(key)
+	}
+	code := run(args, &stdout, &stderr, trustedEnv, live)
 	return stdout.String(), stderr.String(), code
 }

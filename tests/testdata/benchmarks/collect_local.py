@@ -2,8 +2,9 @@
 """Collect local validator cold-start wall time and peak RSS.
 
 Measures a prebuilt Go binary and a warmed `uv run` Python process against
-`--fixture fixtures/valid-high.json --check all`. Does not contact GitHub,
-does not measure clean-CI, and does not write fabricated CI samples.
+`--fixture fixtures/valid-high.json --check all`. It neither contacts GitHub
+nor measures clean-CI. Output is local-only and cannot overwrite the canonical
+Stage 2 evidence record.
 """
 
 from __future__ import annotations
@@ -146,7 +147,7 @@ class _WindowsRssTracker:
                     self._open(child)
             i += 1
 
-    def peak_kib(self) -> int:
+    def current_kib(self) -> int:
         ctypes = self._ctypes
         wintypes = self._wintypes
 
@@ -172,7 +173,7 @@ class _WindowsRssTracker:
                 handle, ctypes.byref(counters), counters.cb
             )
             if ok:
-                total += int(counters.PeakWorkingSetSize) // 1024
+                total += int(counters.WorkingSetSize) // 1024
         return total
 
     def close(self) -> None:
@@ -207,7 +208,7 @@ def linux_tree_rss_kib(root_pid: int) -> int:
         except OSError:
             continue
         for line in lines:
-            if line.startswith("VmHWM:"):
+            if line.startswith("VmRSS:"):
                 total += int(line.split()[1])
                 break
     return total
@@ -216,19 +217,27 @@ def linux_tree_rss_kib(root_pid: int) -> int:
 def darwin_tree_rss_kib(root_pid: int) -> int:
     try:
         completed = subprocess.run(
-            ["ps", "-o", "rss=", "-g", str(root_pid)],
+            ["ps", "-axo", "pid=,ppid=,rss="],
             check=False,
             capture_output=True,
             text=True,
         )
     except OSError:
         return 0
-    total = 0
+    processes: dict[int, tuple[int, int]] = {}
     for line in completed.stdout.splitlines():
-        line = line.strip()
-        if line:
-            total += int(line)
-    return total
+        fields = line.split()
+        if len(fields) == 3:
+            processes[int(fields[0])] = (int(fields[1]), int(fields[2]))
+    descendants = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for pid, (parent, _rss) in processes.items():
+            if parent in descendants and pid not in descendants:
+                descendants.add(pid)
+                changed = True
+    return sum(processes.get(pid, (0, 0))[1] for pid in descendants)
 
 
 def rss_sampler() -> Callable[[int], int]:
@@ -259,8 +268,9 @@ def measure(command: list[str], *, cwd: Path, env: dict[str, str]) -> tuple[int,
     try:
         while True:
             if tracker is not None:
+                peak = max(peak, tracker.current_kib())
                 tracker.discover_children()
-                peak = max(peak, tracker.peak_kib())
+                peak = max(peak, tracker.current_kib())
             elif sample_rss is not None:
                 try:
                     peak = max(peak, sample_rss(proc.pid))
@@ -270,7 +280,7 @@ def measure(command: list[str], *, cwd: Path, env: dict[str, str]) -> tuple[int,
                 break
             time.sleep(0.002)
         if tracker is not None:
-            peak = max(peak, tracker.peak_kib())
+            peak = max(peak, tracker.current_kib())
         elif sample_rss is not None:
             try:
                 peak = max(peak, sample_rss(proc.pid))
@@ -402,7 +412,7 @@ def collect(root: Path, n: int) -> dict[str, object]:
     explanations = [
         "Percentiles use nearest-rank ceil(p*n) on the sorted samples, 1-based, clamped to [1, n].",
         "local_cold_start_ms is wall time of a fresh process `--fixture fixtures/valid-high.json --check all` after one discarded warmup per language. Go is a CGO_ENABLED=0 prebuilt binary; Python is `uv run --project actions/repository-policy --locked python actions/repository-policy/validate.py`. Compiler/uv bootstrap time is excluded.",
-        "peak_rss_kib is process-tree peak working set in KiB. Windows holds process handles and sums PeakWorkingSetSize; Linux uses VmHWM; macOS uses ps rss. This is not ru_maxrss and is not comparable to GitHub runner memory.",
+        "peak_rss_kib is the maximum sampled aggregate current resident set of the process tree in KiB. Windows uses WorkingSetSize while retaining child handles; Linux uses VmRSS; macOS enumerates descendants from ps pid/ppid/rss. This is not ru_maxrss and is not comparable to GitHub runner memory.",
         f"Local host: {platform.platform()} python={platform.python_version()} go={subprocess.run([go, 'version'], capture_output=True, text=True, check=True).stdout.strip()} uv={subprocess.run([uv, '--version'], capture_output=True, text=True, check=True).stdout.strip()}. OS file cache was not dropped.",
         "Local Windows/macOS numbers are not GitHub ubuntu-latest clean-CI samples.",
         "clean_ci_wall_ms.python is pending: requires n>=5 empty-cache production `quality` job durations after this branch is on GitHub. Not fabricated.",
@@ -448,14 +458,19 @@ def main() -> int:
         "--write",
         type=Path,
         default=None,
-        help="Output JSON path (default: tests/testdata/benchmarks/5-go-validator.json)",
+        help="optional local-only output path; canonical Stage 2 evidence is protected",
     )
     args = parser.parse_args()
     root = repo_root_from(args.root.resolve() if args.root else Path.cwd())
+    destination = args.write.resolve() if args.write is not None else None
+    if destination is not None:
+        canonical = (root / "tests" / "testdata" / "benchmarks" / RECORD_NAME).resolve()
+        if destination == canonical:
+            parser.error("local-only collector cannot overwrite canonical Stage 2 evidence")
     record = collect(root, args.n)
-    destination = args.write or (root / "tests" / "testdata" / "benchmarks" / RECORD_NAME)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    if destination is not None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     sys.stdout.write(json.dumps(record, indent=2) + "\n")
     return 0
 
