@@ -92,7 +92,7 @@ jobs:
               *) exit 0 ;;
             esac
           fi
-          for check_name in "Repository policy / contract" "Repository policy / merge approval"; do
+          for check_name in "contract" "merge approval"; do
             gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
               -f "name=${check_name}" \
               -f "head_sha=${HEAD_SHA}" \
@@ -135,7 +135,7 @@ jobs:
             conclusion=failure
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            -f "name=Repository policy / contract" \
+            -f "name=contract" \
             -f "head_sha=${HEAD_SHA}" \
             -f "status=completed" \
             -f "conclusion=${conclusion}" \
@@ -248,7 +248,7 @@ jobs:
             conclusion=failure
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            -f "name=Repository policy / merge approval" \
+            -f "name=merge approval" \
             -f "head_sha=${HEAD_SHA}" \
             -f "status=completed" \
             -f "conclusion=${conclusion}" \
@@ -303,7 +303,7 @@ jobs:
               continue
             fi
             head_sha="$(jq -r '.[1]' <<<"$pull_json")"
-            for check_name in "Repository policy / contract" "Repository policy / merge approval"; do
+            for check_name in "contract" "merge approval"; do
               gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
                 -f "name=${check_name}" \
                 -f "head_sha=${head_sha}" \

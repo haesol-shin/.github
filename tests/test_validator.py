@@ -631,8 +631,10 @@ class ValidatorConformanceTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "repository-policy.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("name: Repository policy / contract", workflow)
-        self.assertIn("name: Repository policy / merge approval", workflow)
+        self.assertIn("name: contract", workflow)
+        self.assertIn("name: merge approval", workflow)
+        self.assertIn('-f "name=contract"', workflow)
+        self.assertIn('-f "name=merge approval"', workflow)
         self.assertIn("needs: [revoke, contract]", workflow)
         self.assertIn("if: ${{ always() }}", workflow)
         policy_workflow = (ROOT / ".github" / "workflows" / "policy.yml").read_text(
@@ -640,8 +642,8 @@ class ValidatorConformanceTests(unittest.TestCase):
         )
         self.assertIn("name: contract", policy_workflow)
         self.assertIn("name: merge approval", policy_workflow)
-        self.assertIn('-f "name=Repository policy / contract"', policy_workflow)
-        self.assertIn('-f "name=Repository policy / merge approval"', policy_workflow)
+        self.assertIn('-f "name=contract"', policy_workflow)
+        self.assertIn('-f "name=merge approval"', policy_workflow)
         self.assertIn("uses: ./.repo-ops/actions/repository-policy", policy_workflow)
         self.assertNotIn("uses: ./.github/workflows/repository-policy.yml", policy_workflow)
         self.assertIn("repo-ops.intent.v1", policy_workflow)

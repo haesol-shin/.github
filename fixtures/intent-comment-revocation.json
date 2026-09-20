@@ -26,8 +26,8 @@
   ],
   "expected": {
     "revoke": [
-      "Repository policy / contract",
-      "Repository policy / merge approval"
+      "contract",
+      "merge approval"
     ],
     "conclusion": "failure",
     "until": "candidate pull request validation reruns"

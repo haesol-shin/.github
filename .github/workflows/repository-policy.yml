@@ -27,7 +27,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ inputs['head-sha'] }}
         run: |
-          for check_name in "Repository policy / contract" "Repository policy / merge approval"; do
+          for check_name in "contract" "merge approval"; do
             gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
               -f "name=${check_name}" \
               -f "head_sha=${HEAD_SHA}" \
@@ -38,7 +38,7 @@ jobs:
           done
   contract:
     needs: revoke
-    name: Repository policy / contract
+    name: contract
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -81,7 +81,7 @@ jobs:
             conclusion=failure
           fi
           if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            -f "name=Repository policy / contract" \
+            -f "name=contract" \
             -f "head_sha=${HEAD_SHA}" \
             -f "status=completed" \
             -f "conclusion=${conclusion}" \
@@ -92,7 +92,7 @@ jobs:
           exit "$validator_result"
 
   merge-approval:
-    name: Repository policy / merge approval
+    name: merge approval
     needs: [revoke, contract]
     if: ${{ always() }}
     runs-on: ubuntu-latest
@@ -142,7 +142,7 @@ jobs:
             conclusion=failure
           fi
           if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            -f "name=Repository policy / merge approval" \
+            -f "name=merge approval" \
             -f "head_sha=${HEAD_SHA}" \
             -f "status=completed" \
             -f "conclusion=${conclusion}" \
