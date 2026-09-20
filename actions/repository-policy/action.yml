@@ -5,7 +5,7 @@ inputs:
     description: Read-only token used to inspect pull request metadata and base-owned policy
     required: true
   check:
-    description: Stable evaluator surface: contract or merge-approval
+    description: "Stable evaluator surface: contract or merge-approval"
     required: false
     default: merge-approval
 runs:
