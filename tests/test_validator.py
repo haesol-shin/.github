@@ -300,6 +300,46 @@ class ValidatorConformanceTests(unittest.TestCase):
             validator.validate_state(state, self.contract_root, check="contract"),
         )
 
+    def test_plan_approval_requires_display_wrapper(self) -> None:
+        state = self.v1_state()
+        state["comments"][0]["body"] = (
+            "repo-ops.plan-approval.v1 decision:approved risk:high "
+            "issue:42 intent:sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc "
+            "plan:sha256:" + "d" * 64 + " plan-commit:" + "d" * 40
+        )
+        self.assertIn(
+            "malformed repo-ops.plan-approval.v1 display wrapper",
+            validator.validate_state(state, self.contract_root, check="contract"),
+        )
+
+    def test_repository_permissions_are_required_for_record_authority(self) -> None:
+        for permission in ("read", "write"):
+            with self.subTest(permission=permission):
+                self.assertFalse(
+                    validator.record_authorized(
+                        {"association": "MEMBER", "permission": permission},
+                        record="repo-ops.merge-review.v1",
+                    )
+                )
+        for permission in ("maintain", "admin"):
+            with self.subTest(permission=permission):
+                self.assertTrue(
+                    validator.record_authorized(
+                        {"association": "COLLABORATOR", "permission": permission},
+                        record="repo-ops.plan-approval.v1",
+                        risk="medium",
+                    )
+                )
+        self.assertFalse(
+            validator.record_authorized(
+                {"association": "MEMBER", "permission": "admin"},
+                record="repo-ops.plan-approval.v1",
+                risk="high",
+            )
+        )
+
+
+
     def test_fenced_intent_examples_are_not_authority(self) -> None:
         examples = (
             "```text\n"
@@ -563,14 +603,24 @@ class ValidatorConformanceTests(unittest.TestCase):
         )
         self.assertIn("name: Repository policy / contract", workflow)
         self.assertIn("name: Repository policy / merge approval", workflow)
-        self.assertIn("needs: contract", workflow)
+        self.assertIn("needs: [revoke, contract]", workflow)
         self.assertIn("if: ${{ always() }}", workflow)
         policy_workflow = (ROOT / ".github" / "workflows" / "policy.yml").read_text(
             encoding="utf-8"
         )
+        self.assertIn("name: Repository policy / contract", policy_workflow)
+        self.assertIn("name: Repository policy / merge approval", policy_workflow)
+        self.assertIn("uses: ./.repo-ops/actions/repository-policy", policy_workflow)
+        self.assertNotIn("uses: ./.github/workflows/repository-policy.yml", policy_workflow)
+        self.assertIn("repo-ops.intent.v1", policy_workflow)
         self.assertIn("checks: write", policy_workflow)
-        self.assertIn("repo-ops.plan-approval.v1", policy_workflow)
-        self.assertIn("repo-ops.merge-review.v1", policy_workflow)
+        quality_workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("  quality:\n    name: quality", quality_workflow)
+        self.assertIn('-f "head_sha=${HEAD_SHA}"', policy_workflow)
+        self.assertIn('-f "conclusion=${conclusion}"', policy_workflow)
+        self.assertIn("needs.revoke.result == 'success'", policy_workflow)
 
     def test_record_rejects_noncanonical_spacing(self) -> None:
         record, error = validator.parse_record_line(

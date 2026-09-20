@@ -30,6 +30,7 @@
     {
       "author": "maintainer",
       "association": "OWNER",
+      "permission": "admin",
       "body": "Intent accepted.\n\nAdd a trusted validator without executing pull request code.\n\nRisk: high\nIntent digest: sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871"
     }
   ],
@@ -37,11 +38,13 @@
     {
       "author": "maintainer",
       "association": "OWNER",
-      "body": "repo-ops.plan-approval.v1 decision:approved risk:high issue:42 intent:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871 plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-commit:dddddddddddddddddddddddddddddddddddddddd"
+      "permission": "admin",
+      "body": "**Plan approved**\n\n- Risk: `high`\n- Intent digest: `sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871`\n- Plan digest: `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`\n- Plan commit: `dddddddddddddddddddddddddddddddddddddddd`\n\nAuthoritative machine-readable record:\n\n```text\nrepo-ops.plan-approval.v1 decision:approved risk:high issue:42 intent:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871 plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-commit:dddddddddddddddddddddddddddddddddddddddd\n```\n"
     },
     {
       "author": "maintainer",
       "association": "OWNER",
+      "permission": "admin",
       "body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:high intent:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871 plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-round:1/5 implementation-round:1/5 base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc runtime:omp/0.1 model:provider/model"
     }
   ],

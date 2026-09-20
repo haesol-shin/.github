@@ -6,15 +6,17 @@
       {
         "author": "maintainer",
         "association": "OWNER",
+        "permission": "admin",
         "body": "Intent accepted.\n\nAdd a trusted validator without executing pull request code.\n\nRisk: high\nIntent digest: sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871\n"
       },
       {
         "author": "maintainer",
         "association": "OWNER",
+        "permission": "admin",
         "body": "**Intent accepted**\n\nAdd a trusted validator without executing pull request code.\n\n- Risk: `high`\n- Intent digest: `sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc`\n- Supersedes: `sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871`\n\nAuthoritative machine-readable record:\n\n```text\nrepo-ops.intent.v1 decision:accepted risk:high intent:sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc supersedes:sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871\n```\n"
       }
     ],
-    "comments.0.body": "repo-ops.plan-approval.v1 decision:approved risk:high issue:42 intent:sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-commit:dddddddddddddddddddddddddddddddddddddddd",
+    "comments.0.body": "**Plan approved**\n\n- Risk: `high`\n- Intent digest: `sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc`\n- Plan digest: `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`\n- Plan commit: `dddddddddddddddddddddddddddddddddddddddd`\n\nAuthoritative machine-readable record:\n\n```text\nrepo-ops.plan-approval.v1 decision:approved risk:high issue:42 intent:sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-commit:dddddddddddddddddddddddddddddddddddddddd\n```\n",
     "comments.1.body": "Ready.\n\nrepo-ops.merge-review.v1 verdict:merge-ready risk:high intent:sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc plan:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd plan-round:1/5 implementation-round:1/5 base:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa head:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb diff:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc runtime:omp/0.1 model:provider/model"
   },
   "expected": null

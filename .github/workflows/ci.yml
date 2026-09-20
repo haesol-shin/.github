@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   quality:
-    name: CI / quality
+    name: quality
     runs-on: ubuntu-latest
     steps:
       - name: Check out contract repository

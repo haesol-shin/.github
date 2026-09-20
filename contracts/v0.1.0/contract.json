@@ -38,15 +38,18 @@
   "risk_authority": {
     "low": {
       "plan": "none",
-      "approval_associations": []
+      "approval_associations": [],
+      "approval_permissions": []
     },
     "medium": {
       "plan": "required",
-      "approval_associations": ["MAINTAINER", "ADMIN", "OWNER"]
+      "approval_associations": ["OWNER"],
+      "approval_permissions": ["maintain", "admin"]
     },
     "high": {
       "plan": "required",
-      "approval_associations": ["OWNER"]
+      "approval_associations": ["OWNER"],
+      "approval_permissions": []
     }
   },
   "records": {

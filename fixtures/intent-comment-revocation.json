@@ -1,0 +1,35 @@
+{
+  "contract": "repo-ops/v0.1.0",
+  "event": {
+    "name": "issue_comment",
+    "action": "edited",
+    "issue": {
+      "number": 3,
+      "pull_request": null
+    },
+    "comment": {
+      "author_association": "OWNER",
+      "body": "repo-ops.intent.v1 decision:accepted ..."
+    },
+    "changes": {
+      "body": {
+        "from": "repo-ops.intent.v1 decision:accepted previous..."
+      }
+    }
+  },
+  "affected_open_pull_requests": [
+    {
+      "number": 6,
+      "authority": "Related #3",
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "expected": {
+    "revoke": [
+      "Repository policy / contract",
+      "Repository policy / merge approval"
+    ],
+    "conclusion": "failure",
+    "until": "candidate pull request validation reruns"
+  }
+}

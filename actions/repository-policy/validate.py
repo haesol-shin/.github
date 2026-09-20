@@ -212,21 +212,46 @@ def validate_changelog_state(
         except ValueError as error:
             errors.append(str(error))
     return errors
-AUTHORIZED_ASSOCIATIONS = {"OWNER", "MEMBER"}
+AUTHORIZED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+REPOSITORY_PERMISSIONS = {"maintain", "admin"}
 RISK_AUTHORITY = CONTRACT.get(
     "risk_authority",
     {
-        "low": {"approval_associations": []},
-        "medium": {"approval_associations": ["MAINTAINER", "ADMIN", "OWNER"]},
-        "high": {"approval_associations": ["OWNER"]},
+        "low": {"approval_associations": [], "approval_permissions": []},
+        "medium": {
+            "approval_associations": ["OWNER"],
+            "approval_permissions": ["maintain", "admin"],
+        },
+        "high": {"approval_associations": ["OWNER"], "approval_permissions": []},
     },
 )
-PLAN_APPROVAL_ASSOCIATIONS = {
-    association
-    for definition in RISK_AUTHORITY.values()
-    for association in definition.get("approval_associations", [])
-}
-PLAN_RECORD_ASSOCIATIONS = PLAN_APPROVAL_ASSOCIATIONS | AUTHORIZED_ASSOCIATIONS
+
+
+def record_candidate(entry: dict[str, Any]) -> bool:
+    return (
+        entry.get("association") in AUTHORIZED_ASSOCIATIONS
+        or entry.get("permission") in REPOSITORY_PERMISSIONS
+    )
+
+
+def record_authorized(
+    entry: dict[str, Any],
+    *,
+    record: str,
+    risk: str | None = None,
+) -> bool:
+    if record == "repo-ops.plan-approval.v1":
+        if risk is None:
+            return False
+        authority = RISK_AUTHORITY.get(risk, {})
+        return (
+            entry.get("association") in authority.get("approval_associations", [])
+            or entry.get("permission") in authority.get("approval_permissions", [])
+        )
+    return (
+        entry.get("association") == "OWNER"
+        or entry.get("permission") in REPOSITORY_PERMISSIONS
+    )
 
 
 def normalize_text(value: str) -> str:
@@ -539,6 +564,38 @@ def parse_round(value: str, *, allow_none: bool) -> tuple[int | None, int | None
         return None, None
     return int(match.group(1)), int(match.group(2))
 
+def parse_plan_approval(body: str) -> tuple[dict[str, Any] | None, str | None]:
+    normalized = normalize_text(body)
+    match = re.fullmatch(
+        r"\*\*Plan approved(?: — [^\n]+)?\*\*\n\n"
+        r"- Risk: `(?P<display_risk>low|medium|high)`\n"
+        r"- Intent digest: `(?P<display_intent>sha256:[0-9a-f]{64})`\n"
+        r"- Plan digest: `(?P<display_plan>sha256:[0-9a-f]{64})`\n"
+        r"- Plan commit: `(?P<display_commit>[0-9a-f]{40})`\n\n"
+        r"Authoritative machine-readable record:\n\n"
+        r"```text\n"
+        r"repo-ops\.plan-approval\.v1[^\n]*\n"
+        r"```\n",
+        normalized,
+    )
+    if not match:
+        return None, "malformed repo-ops.plan-approval.v1 display wrapper"
+    record, record_error = parse_record_line(body, "repo-ops.plan-approval.v1")
+    if record_error:
+        return None, record_error
+    if record is None:
+        return None, "repo-ops.plan-approval.v1 record is missing"
+    displayed = {
+        "risk": match.group("display_risk"),
+        "intent": match.group("display_intent"),
+        "plan": match.group("display_plan"),
+        "plan-commit": match.group("display_commit"),
+    }
+    for field, value in displayed.items():
+        if record.get(field) != value:
+            return None, f"plan approval displayed {field} does not match its raw record"
+    return record, None
+
 
 def latest_record(
     entries: list[dict[str, Any]],
@@ -547,7 +604,10 @@ def latest_record(
     found: list[tuple[dict[str, Any], dict[str, Any]]] = []
     errors: list[str] = []
     for entry in entries:
-        parsed, error = parse_record_line(entry.get("body") or "", record)
+        if record == "repo-ops.plan-approval.v1":
+            parsed, error = parse_plan_approval(entry.get("body") or "")
+        else:
+            parsed, error = parse_record_line(entry.get("body") or "", record)
         if error:
             errors.append(error)
         elif parsed:
@@ -628,12 +688,8 @@ def validate_state(
             validate_heading_contract(issue_body, CONTRACT["issue"], "linked issue body")
         )
     reviews = state.get("reviews") or []
-    authorized_comments = [
-        entry for entry in comments if entry.get("association") in AUTHORIZED_ASSOCIATIONS
-    ]
-    authorized_reviews = [
-        entry for entry in reviews if entry.get("association") in AUTHORIZED_ASSOCIATIONS
-    ]
+    authorized_comments = [entry for entry in comments if record_candidate(entry)]
+    authorized_reviews = [entry for entry in reviews if record_candidate(entry)]
     records = [
         *({**entry, "surface": "comment"} for entry in authorized_comments),
         *({**entry, "surface": "review"} for entry in authorized_reviews),
@@ -644,7 +700,7 @@ def validate_state(
         chain_head: dict[str, Any] | None = None
         saw_v1 = False
         for comment in state.get("intent_comments") or []:
-            if comment.get("association") not in AUTHORIZED_ASSOCIATIONS:
+            if not record_candidate(comment):
                 continue
             parsed_intent, intent_error = parse_intent(
                 comment.get("body") or "",
@@ -655,6 +711,9 @@ def validate_state(
                 errors.append(intent_error)
                 continue
             if parsed_intent is None:
+                continue
+            if not record_authorized(comment, record="repo-ops.intent.v1"):
+                errors.append("accepted intent was not posted by an authorized maintainer")
                 continue
             if parsed_intent["kind"] == "legacy":
                 if saw_v1:
@@ -681,11 +740,7 @@ def validate_state(
     if risk in {"medium", "high"} and expected_plan == "none":
         errors.append(f"{risk}-risk work requires a current plan")
 
-    plan_comments = [
-        entry
-        for entry in comments
-        if entry.get("association") in PLAN_RECORD_ASSOCIATIONS
-    ]
+    plan_comments = [entry for entry in comments if record_candidate(entry)]
     if risk in {"medium", "high"}:
         approval, approval_entry, approval_errors = latest_record(
             plan_comments,
@@ -710,10 +765,11 @@ def validate_state(
             for key, value in expected_approval.items():
                 if value is not None and approval.get(key) != value:
                     errors.append(f"plan approval {key} does not match current work")
-            required_associations = set(
-                RISK_AUTHORITY.get(risk, {}).get("approval_associations", [])
-            )
-            if approval_entry and approval_entry.get("association") not in required_associations:
+            if approval_entry is None or not record_authorized(
+                approval_entry,
+                record="repo-ops.plan-approval.v1",
+                risk=risk,
+            ):
                 errors.append(f"{risk}-risk plan approval was not posted by an authorized maintainer")
             if approval.get("plan-commit") not in (state.get("plan_commits") or []):
                 errors.append("approved plan commit is not in the pull request history")
@@ -763,7 +819,10 @@ def validate_state(
                     f"{risk}-risk implementation round must be n/{limits['implementation']}"
                 )
 
-            if receipt_entry and receipt_entry.get("association") not in AUTHORIZED_ASSOCIATIONS:
+            if receipt_entry and not record_authorized(
+                receipt_entry,
+                record="repo-ops.merge-review.v1",
+            ):
                 errors.append("merge review was not posted by an authorized maintainer")
             if policy.get("review", {}).get("shared_identity") is False:
                 if receipt_entry and receipt_entry.get("surface") != "review":
@@ -929,11 +988,33 @@ def git_metadata(
     return merge_base, f"sha256:{digest.hexdigest()}"
 
 
-def entry_from_api(item: dict[str, Any]) -> dict[str, Any]:
+def collaborator_permission(
+    client: GitHubClient,
+    repository: str,
+    login: str | None,
+    cache: dict[str, str | None],
+) -> str | None:
+    if not login:
+        return None
+    if login in cache:
+        return cache[login]
+    try:
+        result = client.get(
+            f"/repos/{repository}/collaborators/{urllib.parse.quote(login, safe='')}/permission"
+        )
+    except RuntimeError:
+        result = {}
+    permission = result.get("permission") if isinstance(result, dict) else None
+    cache[login] = permission if isinstance(permission, str) else None
+    return cache[login]
+
+
+def entry_from_api(item: dict[str, Any], *, permission: str | None = None) -> dict[str, Any]:
     return {
         "body": item.get("body") or "",
         "author": (item.get("user") or {}).get("login"),
         "association": item.get("author_association"),
+        "permission": permission,
     }
 
 
@@ -988,15 +1069,35 @@ def build_live_state(event_path: Path) -> dict[str, Any]:
     )
     merge_base_sha = comparison["merge_base_commit"]["sha"]
     merge_base, diff_digest = git_metadata(pull_request, token, merge_base_sha)
+    permission_cache: dict[str, str | None] = {}
+
+    def hydrated_entry(
+        item: dict[str, Any],
+        *,
+        permission_required: bool = False,
+    ) -> dict[str, Any]:
+        body = item.get("body") or ""
+        login = (item.get("user") or {}).get("login")
+        permission = None
+        if permission_required or any(
+            marker in body
+            for marker in (
+                "repo-ops.intent.v1",
+                "repo-ops.plan-approval.v1",
+                "repo-ops.merge-review.v1",
+            )
+        ):
+            permission = collaborator_permission(client, repository, login, permission_cache)
+        return entry_from_api(item, permission=permission)
 
     pr_comments = [
-        entry_from_api(item)
+        hydrated_entry(item)
         for item in client.get_all(
             f"/repos/{repository}/issues/{number}/comments?per_page=100"
         )
     ]
     reviews = [
-        entry_from_api(item)
+        hydrated_entry(item)
         for item in client.get_all(
             f"/repos/{repository}/pulls/{number}/reviews?per_page=100"
         )
@@ -1009,8 +1110,9 @@ def build_live_state(event_path: Path) -> dict[str, Any]:
     if issue_number is not None:
         issue_document = client.get(f"/repos/{repository}/issues/{issue_number}")
         issue_body = issue_document.get("body") or ""
+
         intent_comments = [
-            entry_from_api(item)
+            hydrated_entry(item, permission_required=True)
             for item in client.get_all(
                 f"/repos/{repository}/issues/{issue_number}/comments?per_page=100"
             )
@@ -1025,11 +1127,12 @@ def build_live_state(event_path: Path) -> dict[str, Any]:
 
     approval_commits: list[str] = []
     for comment in (
-        entry
-        for entry in pr_comments
-        if entry.get("association") in PLAN_RECORD_ASSOCIATIONS
+        *pr_comments,
+        *reviews,
     ):
-        approval, _ = parse_record_line(comment["body"], "repo-ops.plan-approval.v1")
+        if not record_candidate(comment):
+            continue
+        approval, _ = parse_plan_approval(comment["body"])
         if not approval:
             continue
         plan_commit = approval["plan-commit"]

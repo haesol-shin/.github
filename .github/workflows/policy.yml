@@ -17,28 +17,41 @@ jobs:
       pull-requests: read
       contents: read
     outputs:
-      base-sha: ${{ steps.base.outputs.sha }}
+      base-sha: ${{ steps.base.outputs.base-sha }}
+      head-sha: ${{ steps.base.outputs.head-sha }}
     steps:
       - id: base
-        name: Resolve pull request base
+        name: Resolve pull request base and head
         env:
           EVENT_NAME: ${{ github.event_name }}
           DEFAULT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          DEFAULT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
-            gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ github.event.issue.number }}" --jq .base.sha > base-sha
+          if [[ "$EVENT_NAME" == "issue_comment" ]] &&
+            jq -e '.issue.pull_request != null' "$GITHUB_EVENT_PATH" >/dev/null; then
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/$(jq -r .issue.number "$GITHUB_EVENT_PATH")" > pull-request.json
+            jq -r .base.sha pull-request.json > base-sha
+            jq -r .head.sha pull-request.json > head-sha
           else
             printf '%s\n' "$DEFAULT_BASE_SHA" > base-sha
+            printf '%s\n' "$DEFAULT_HEAD_SHA" > head-sha
           fi
-          printf 'sha=%s\n' "$(cat base-sha)" >> "$GITHUB_OUTPUT"
-  contract:
+          printf 'base-sha=%s\n' "$(cat base-sha)" >> "$GITHUB_OUTPUT"
+          printf 'head-sha=%s\n' "$(cat head-sha)" >> "$GITHUB_OUTPUT"
+
+  revoke:
     needs: prepare
     if: >-
       github.event_name == 'pull_request_target' ||
       (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
+        (
+          github.event.comment.author_association == 'OWNER' ||
+          github.event.comment.author_association == 'MEMBER' ||
+          github.event.comment.author_association == 'COLLABORATOR'
+        ) &&
         (
           contains(github.event.comment.body, 'repo-ops.plan-approval.v1') ||
           contains(github.event.comment.body, 'repo-ops.merge-review.v1') ||
@@ -49,17 +62,223 @@ jobs:
       (
         github.event_name == 'pull_request_review' &&
         (
+          github.event.review.author_association == 'OWNER' ||
+          github.event.review.author_association == 'MEMBER' ||
+          github.event.review.author_association == 'COLLABORATOR'
+        ) &&
+        (
           contains(github.event.review.body, 'repo-ops.plan-approval.v1') ||
           contains(github.event.review.body, 'repo-ops.merge-review.v1') ||
           contains(github.event.changes.body.from, 'repo-ops.plan-approval.v1') ||
           contains(github.event.changes.body.from, 'repo-ops.merge-review.v1')
         )
       )
-    uses: ./.github/workflows/repository-policy.yml
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+    steps:
+      - name: Revoke stale exact-head results
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+        run: |
+          for check_name in "Repository policy / contract" "Repository policy / merge approval"; do
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+              -f "name=${check_name}" \
+              -f "head_sha=${HEAD_SHA}" \
+              -f "status=completed" \
+              -f "conclusion=failure" \
+              -f "output[title]=Validation pending" \
+              -f "output[summary]=Previous policy result revoked before candidate validation."
+          done
+
+  contract:
+    name: Repository policy / contract
+    needs: [prepare, revoke]
+    if: >-
+      always() && (
+        needs.revoke.result == 'success'
+      )
+    runs-on: ubuntu-latest
     permissions:
       checks: write
       contents: read
       issues: read
       pull-requests: read
-    with:
-      contract-ref: ${{ needs.prepare.outputs.base-sha }}
+    steps:
+      - name: Validate immutable contract reference
+        env:
+          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+        run: |
+          [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "contract-ref must be a full commit SHA" >&2
+            exit 1
+          }
+      - name: Fetch trusted validator
+        env:
+          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
+          git -C .repo-ops checkout --detach "$CONTRACT_REF"
+      - name: Validate repository contract
+        id: validate
+        continue-on-error: true
+        uses: ./.repo-ops/actions/repository-policy
+        with:
+          github-token: ${{ github.token }}
+          check: contract
+      - name: Publish exact contract check
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          VALIDATOR_OUTCOME: ${{ steps.validate.outcome }}
+        run: |
+          if [[ "$VALIDATOR_OUTCOME" == "success" ]]; then
+            conclusion=success
+          else
+            conclusion=failure
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f "name=Repository policy / contract" \
+            -f "head_sha=${HEAD_SHA}" \
+            -f "status=completed" \
+            -f "conclusion=${conclusion}" \
+            -f "output[title]=Contract evaluation" \
+            -f "output[summary]=Trusted base-owned contract evaluation completed."
+          [[ "$VALIDATOR_OUTCOME" == "success" ]]
+
+  merge-approval:
+    name: Repository policy / merge approval
+    needs: [prepare, revoke, contract]
+    if: >-
+      always() &&
+      needs.revoke.result == 'success' &&
+      (
+        github.event_name == 'pull_request_target' ||
+        (
+          github.event_name == 'issue_comment' &&
+          github.event.issue.pull_request &&
+          (
+            github.event.comment.author_association == 'OWNER' ||
+            github.event.comment.author_association == 'MEMBER' ||
+            github.event.comment.author_association == 'COLLABORATOR'
+          ) &&
+          (
+            contains(github.event.comment.body, 'repo-ops.plan-approval.v1') ||
+            contains(github.event.comment.body, 'repo-ops.merge-review.v1') ||
+            contains(github.event.changes.body.from, 'repo-ops.plan-approval.v1') ||
+            contains(github.event.changes.body.from, 'repo-ops.merge-review.v1')
+          )
+        ) ||
+        (
+          github.event_name == 'pull_request_review' &&
+          (
+            github.event.review.author_association == 'OWNER' ||
+            github.event.review.author_association == 'MEMBER' ||
+            github.event.review.author_association == 'COLLABORATOR'
+          ) &&
+          (
+            contains(github.event.review.body, 'repo-ops.plan-approval.v1') ||
+            contains(github.event.review.body, 'repo-ops.merge-review.v1') ||
+            contains(github.event.changes.body.from, 'repo-ops.plan-approval.v1') ||
+            contains(github.event.changes.body.from, 'repo-ops.merge-review.v1')
+          )
+        )
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Validate immutable contract reference
+        env:
+          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+        run: |
+          [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "contract-ref must be a full commit SHA" >&2
+            exit 1
+          }
+      - name: Fetch trusted validator
+        env:
+          CONTRACT_REF: ${{ needs.prepare.outputs.base-sha }}
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/haesol-shin/.github.git .repo-ops
+          git -C .repo-ops checkout --detach "$CONTRACT_REF"
+      - name: Validate merge approval
+        id: validate
+        continue-on-error: true
+        uses: ./.repo-ops/actions/repository-policy
+        with:
+          github-token: ${{ github.token }}
+          check: merge-approval
+      - name: Publish exact merge approval check
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          REVOKE_RESULT: ${{ needs.revoke.result }}
+          VALIDATOR_OUTCOME: ${{ steps.validate.outcome }}
+        run: |
+          if [[ "$CONTRACT_RESULT" == "success" && "$REVOKE_RESULT" == "success" && "$VALIDATOR_OUTCOME" == "success" ]]; then
+            conclusion=success
+          else
+            conclusion=failure
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f "name=Repository policy / merge approval" \
+            -f "head_sha=${HEAD_SHA}" \
+            -f "status=completed" \
+            -f "conclusion=${conclusion}" \
+            -f "output[title]=Merge approval evaluation" \
+            -f "output[summary]=Trusted base-owned exact-head evaluation completed."
+          [[ "$conclusion" == "success" ]]
+
+  intent-revocation:
+    needs: prepare
+    if: >-
+      github.event_name == 'issue_comment' &&
+      !github.event.issue.pull_request &&
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      ) &&
+      (
+        contains(github.event.comment.body, 'repo-ops.intent.v1') ||
+        contains(github.event.changes.body.from, 'repo-ops.intent.v1')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Revoke checks for open pull requests linked to the Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/pulls?state=open&per_page=100" --jq '.[].number' |
+          while read -r pull_number; do
+            pull_request="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pull_number}")"
+            body="$(jq -r '.body // ""' <<<"$pull_request")"
+            if ! jq -nr --arg body "$body" --arg issue "$ISSUE_NUMBER" \
+              '$body | test("(?m)^(Fixes|Closes|Related)[[:space:]]+#" + $issue + "$")'; then
+              continue
+            fi
+            head_sha="$(jq -r '.head.sha' <<<"$pull_request")"
+            for check_name in "Repository policy / contract" "Repository policy / merge approval"; do
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+                -f "name=${check_name}" \
+                -f "head_sha=${head_sha}" \
+                -f "status=completed" \
+                -f "conclusion=failure" \
+                -f "output[title]=Intent authority changed" \
+                -f "output[summary]=Policy checks revoked until the linked pull request is revalidated."
+            done
+          done
