@@ -212,7 +212,7 @@ def validate_changelog_state(
         except ValueError as error:
             errors.append(str(error))
     return errors
-AUTHORIZED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+AUTHORIZED_ASSOCIATIONS = {"OWNER"}
 REPOSITORY_PERMISSIONS = {"maintain", "admin"}
 RISK_AUTHORITY = CONTRACT.get(
     "risk_authority",

@@ -267,7 +267,9 @@ jobs:
       ) &&
       (
         contains(github.event.comment.body, 'repo-ops.intent.v1') ||
-        contains(github.event.changes.body.from, 'repo-ops.intent.v1')
+        contains(github.event.comment.body, 'Intent accepted.') ||
+        contains(github.event.changes.body.from, 'repo-ops.intent.v1') ||
+        contains(github.event.changes.body.from, 'Intent accepted.')
       )
     runs-on: ubuntu-latest
     permissions:

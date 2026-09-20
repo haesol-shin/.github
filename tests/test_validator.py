@@ -337,6 +337,36 @@ class ValidatorConformanceTests(unittest.TestCase):
                 risk="high",
             )
         )
+    def test_submaintainer_record_candidates_are_ignored(self) -> None:
+        plan_state = self.v1_state()
+        plan_candidate = {
+            "association": "MEMBER",
+            "permission": "read",
+            "body": "repo-ops.plan-approval.v1 malformed",
+        }
+        self.assertFalse(validator.record_candidate(plan_candidate))
+        plan_state["comments"].append(plan_candidate)
+        self.assertEqual([], validator.validate_state(plan_state, self.contract_root))
+
+        merge_state, _ = validator.load_fixture(self.fixtures / "valid-low-direct.json")
+        merge_candidate = {
+            "association": "COLLABORATOR",
+            "permission": "write",
+            "body": "repo-ops.merge-review.v1 malformed",
+        }
+        self.assertFalse(validator.record_candidate(merge_candidate))
+        merge_state["comments"].append(merge_candidate)
+        self.assertEqual([], validator.validate_state(merge_state, self.contract_root))
+
+        intent_state = self.v1_state()
+        intent_candidate = {
+            "association": "COLLABORATOR",
+            "permission": "write",
+            "body": "repo-ops.intent.v1 malformed",
+        }
+        self.assertFalse(validator.record_candidate(intent_candidate))
+        intent_state["intent_comments"].append(intent_candidate)
+        self.assertEqual([], validator.validate_state(intent_state, self.contract_root))
 
 
 
@@ -616,6 +646,7 @@ class ValidatorConformanceTests(unittest.TestCase):
         self.assertNotIn("uses: ./.github/workflows/repository-policy.yml", policy_workflow)
         self.assertIn("repo-ops.intent.v1", policy_workflow)
         self.assertIn("checks: write", policy_workflow)
+        self.assertIn("Intent accepted.", policy_workflow)
         self.assertNotIn("needs: prepare", policy_workflow)
         self.assertNotIn("needs: revoke", policy_workflow)
         self.assertIn("needs: contract", policy_workflow)
