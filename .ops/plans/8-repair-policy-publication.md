@@ -268,7 +268,7 @@ Change `validate_heading_contract` / `validate_state` so missing, duplicate, or 
 - `… contains duplicate ## Summary`
 - `… required headings must appear in contract order`
 
-Do not treat `## Completion criteria` on Issue #5 as a contract blocker after this change. Changelog declarations, authority lines, risk lines, and fenced machine records remain blocking.
+Do not treat `## Completion criteria` on Issue #5 as a contract blocker after this change. The `repo-ops.changelog.v1` record, authority lines, risk lines, and fenced machine records remain blocking.
 
 ### Merge-review records without round counters
 

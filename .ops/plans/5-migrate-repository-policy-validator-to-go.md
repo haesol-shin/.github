@@ -3,13 +3,13 @@
 Issue: #5
 Current v1 intent: `sha256:1fe86d9dba7114bb75df62a4b31048ba11a9bb9eac4f3bc10fee17882cf71e11`
 Supersedes: `sha256:3c5898cf216583590419b74147ed57bf4af27a762d3ee5a470d93036a6750cb7`
-Frozen production oracle: `fe229702e88cda5e1fb7ad142112edb50fd57c82` (unconditional; `origin/main` after PR #9)
+PR #7 smoke publisher: `fe229702e88cda5e1fb7ad142112edb50fd57c82` (`origin/main` after PR #9). Stage 1 goldens: Issue #11 repaired-base Python oracle after PR #10 rebases; regenerate before resuming.
 
 ## Approach
 
 Replace the production repository-policy validator with one Go implementation before `repo-ops/v0.1.0` is released. Preserve semantic findings (codes/meaning) and order, exit codes, canonical intent/plan/diff digests, check conclusions, event behavior, and trust boundaries. Machine contexts remain exactly `quality`, `contract`, and `merge approval`. Python is a temporary compatibility oracle only. After zero semantic divergence, delete the Python validator, uv, and validator runtime dependencies in one clean cutover. Rollback is a normal revert to the last Python production commit, not a second live implementation.
 
-The oracle SHA `fe229702e88cda5e1fb7ad142112edb50fd57c82` is frozen by this plan. Replacing it requires editing this file, a new plan digest, and owner re-approval. Do not silently rebase the oracle onto later `main`.
+The PR #7 smoke publisher SHA `fe229702e88cda5e1fb7ad142112edb50fd57c82` is immutable historical evidence. After Issue #11 merges, PR #10 regenerates `tests/testdata/go-oracle` and the differential corpus from the repaired-base Python oracle, then resumes Stage 1. Do not silently rebase the oracle onto later `main` except that authorized regeneration.
 
 Compatibility does **not** freeze Python `jsonschema` or PyYAML diagnostic wording, argparse library text, or stdout/stderr whitespace. Do not require rendered workflow/job labels such as `CI / quality` or `Repository policy / contract`. Do not claim those UI strings as machine contexts.
 
@@ -74,7 +74,7 @@ GitHub collection to preserve:
 - Reviews with empty body or `state == DISMISSED` are ignored.
 - Trusted code, schemas, and the action checkout are the immutable base SHA. Pull-request code is never executed.
 
-Generic Issue/PR headings are advisory: `validate_heading_contract` returns no findings. Templates and `contract.json` heading lists remain documentation. Changelog declarations, authority lines, risk lines, and fenced machine records remain blocking. `repo-ops.merge-review.v1` field order is `verdict risk intent plan base head diff runtime model` with no `plan-round` or `implementation-round`.
+Generic Issue/PR headings are advisory: `validate_heading_contract` returns no findings. Templates and `contract.json` heading lists remain documentation. The `repo-ops.changelog.v1` record, authority lines, risk lines, and fenced machine records remain blocking. `repo-ops.merge-review.v1` field order is `verdict risk intent plan base head diff runtime model` with no `plan-round` or `implementation-round`.
 
 `changelog.py` is not the trusted live validator, but CI currently loads it through the same unittest module and `validate.py` imports `parse_fragment` for fragment body checks. Cutover deletes uv and the validator Python path; folding therefore moves into Go in stage 3 so no Python/uv validator setup remains. Until cutover, Python folding remains the oracle.
 
@@ -107,7 +107,7 @@ Rejected alternatives:
 - Changing evaluator-authored finding text to be “more idiomatic”.
 - Freezing `jsonschema` / PyYAML diagnostic strings or stdout/stderr whitespace as cutover gates.
 - Reintroducing merge-review round counters or blocking generic-heading findings.
-- Silently rebasing the frozen oracle SHA.
+- Silently rebasing the Stage 1 oracle SHA except the Issue #11 repaired-base regeneration.
 - Treating a live GitHub pull request as the Stage 2 replay oracle.
 - New production dependency manager or container bootstrap.
 
@@ -117,7 +117,7 @@ Dependencies: standard library for HTTP, git subprocess, JSON, SHA-256, and CLI.
 
 All stages are separate `Related #5` pull requests against the then-current `main`. High-risk plan approval on each implementation pull request names this plan digest and the plan commit that introduced it (or a later reviewed plan commit if this file changes). There is no plan-round or implementation-round limit.
 
-**Stage 1 — freeze and fixture evaluator.** Export language-independent semantic golden artifacts from the Python oracle **at** `fe229702e88cda5e1fb7ad142112edb50fd57c82` only. Land `cmd/repo-ops-validator --fixture` plus `internal/{canonical,evaluate,schema,fixture}` with no GitHub or git collection. Land the checked-in harness. Production workflows stay Python. Changelog fragment `changelog.d/5-go-validator.md` is created here (`Changelog: required`). Do not start this stage until PR #7 smoke, owner plan approval, and the exact-head evidence comment exist.
+**Stage 1 — freeze and fixture evaluator.** After Issue #11 merges, rebase PR #10 onto that exact `main` commit, set the pull request body to `repo-ops.changelog.v1 kind:required value:go-validator`, and export language-independent semantic golden artifacts from the repaired-base Python oracle only. Land `cmd/repo-ops-validator --fixture` plus `internal/{canonical,evaluate,schema,fixture}` with no GitHub or git collection. Land the checked-in harness. Production workflows stay Python. Changelog fragment `changelog.d/5-go-validator.md` is created here. Do not start this stage until PR #7 smoke, owner plan approval, the exact-head evidence comment, and the repaired-base golden regeneration exist.
 
 **Stage 2 — collector, replay, shadow, benchmarks.** Implement `internal/collect` and live `--event`. Land deterministic **validator** replay bundles (webhook + recorded HTTP + git objects) and run both implementations against the same local API/git. Land separate **workflow-only** intent-revocation bundles with check-run/revocation expected outputs; those are not CLI matrix cases. A real pull request is advisory shadow only. Record benchmarks, including Go clean-CI from an isolated non-production procedure. Production workflows still call Python. Repair every semantic divergence; do not cut over.
 
@@ -173,7 +173,7 @@ gh api "repos/haesol-shin/.github/actions/jobs/${PUBLISH_JOB}/logs" \
 
    After owner `repo-ops.plan-approval.v1` on this head, post a PR comment on the **same** 40-hex head that quotes `check-runs.json` summaries, every Actions job name from `jobs-*.json`, and the `publish.log` excerpt proving composite load. Stage 1 must not start without that exact-head evidence comment.
 
-3. **Stage 1 freeze.** From repository root, using the Python oracle **only** at `fe229702e88cda5e1fb7ad142112edb50fd57c82`, write golden files under `tests/testdata/go-oracle/` (gitignored working copy under `.ops/evidence/5-go-validator/oracle/` is acceptable during authoring):
+3. **Stage 1 freeze.** From repository root, using the Python oracle **only** at the Issue #11 repaired `main` commit, write golden files under `tests/testdata/go-oracle/` (gitignored working copy under `.ops/evidence/5-go-validator/oracle/` is acceptable during authoring):
 
    - For every `fixtures/*.json` except `changelog-conformance.json` and `intent-comment-revocation.json`, run `--check all`, `--check contract`, and `--check merge-approval`.
    - Capture `{exit, findings, check_conclusion}` where `findings` is every `::warning title=Repository policy::` suffix in order, and `check_conclusion` is `success` iff `exit == 0` else `failure`. Do not treat full stdout/stderr bytes as goldens.
@@ -276,7 +276,7 @@ The validator `diff_digest` must equal `sha256:` plus that hex. Include a binary
 
 ```json
 {
-  "oracle_commit": "fe229702e88cda5e1fb7ad142112edb50fd57c82",
+  "oracle_commit": "<40-hex Issue #11 repaired main>",
   "go_commit": "<40-hex>",
   "local_cold_start_ms": {
     "python": {"samples": [], "p50": 0, "p95": 0, "n": 0},
@@ -368,6 +368,6 @@ Must **not** fail: missing, duplicate, or reordered generic Issue/PR headings (a
 
 ### Explicit non-authority
 
-This plan does not authorize: merging without owner plan approval; starting Go before PR #7 smoke and the exact-head evidence comment; changing rulesets; enabling required checks; tagging or releasing `v0.1.0`; closing Issue #3 or Issue #5; adopting `repo-ops/v0.1.0` in a consumer; keeping Python as a production fallback after stage 3; replacing the frozen oracle SHA without a new plan digest.
+This plan does not authorize: merging without owner plan approval; starting Go before PR #7 smoke, the exact-head evidence comment, and repaired-base golden regeneration; changing rulesets; enabling required checks; tagging or releasing `v0.1.0`; closing Issue #3 or Issue #5; adopting `repo-ops/v0.1.0` in a consumer; keeping Python as a production fallback after stage 3; replacing the Stage 1 oracle except the Issue #11 repaired-base regeneration.
 
 If stage 1, 2, or 3 review fails, repair that branch. If compatibility or trust diverges, fix Go until the harness artifacts match. If cutover CI fails, revert the cutover commit. If a defect is found after `v0.1.0` publication (a later Issue #3 gate), do not rewrite that tag.

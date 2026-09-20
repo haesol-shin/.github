@@ -19,7 +19,7 @@ A fragment contains one or more of these exact level-two headings:
 - `Fixed`
 - `Security`
 
-Each heading MUST have at least one non-empty `- ` bullet. Keep bullets self-contained and do not add prose outside the headings. Fragment files are folded in stable filename order when a release pull request declares `Changelog: release — vX.Y.Z`.
+Each heading MUST have at least one non-empty `- ` bullet. Keep bullets self-contained and do not add prose outside the headings. Fragment files are folded in stable filename order when a release pull request declares `repo-ops.changelog.v1 kind:release value:vX.Y.Z`.
 
 Ordinary pull requests MUST NOT edit `CHANGELOG.md` or delete fragments. A release pull request consumes validated fragments and writes the generated version entry.
 

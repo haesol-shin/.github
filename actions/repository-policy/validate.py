@@ -30,48 +30,38 @@ RECORD_ORDERS = {
 }
 AUTHORITY_LINKS = CONTRACT["pull_request"].get("authority_links", {})
 
-CHANGELOG_DECLARATION_PATTERN = re.compile(
-    r"^- Changelog: (?P<kind>required|not-required|release) — (?P<value>\S.*\S|\S)$"
-)
-CHANGELOG_VERSION_PATTERN = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
 FRAGMENT_FILENAME_PATTERN = re.compile(
     r"^(?P<issue>[1-9][0-9]*|direct)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$"
 )
 
 
-def parse_changelog_declaration(body: str) -> tuple[dict[str, str] | None, list[str]]:
-    candidates = [
-        line.strip()
-        for line in markdown_block_lines(body)
-        if line.strip().startswith("- Changelog:")
-    ]
-    errors: list[str] = []
-    declarations: list[dict[str, str]] = []
-    for line in candidates:
-        match = CHANGELOG_DECLARATION_PATTERN.fullmatch(line)
-        if not match:
-            errors.append(
-                "pull request changelog declaration must use "
-                "`- Changelog: required|not-required|release — <value>`"
-            )
+def parse_changelog_declaration(
+    body: str,
+    contract_root: Path | None = None,
+) -> tuple[dict[str, str] | None, list[str]]:
+    record = "repo-ops.changelog.v1"
+    candidates: list[str] = []
+    for line in unfenced_lines(body):
+        stripped = line.strip()
+        if not stripped:
             continue
-        kind = match.group("kind")
-        value = match.group("value").strip()
-        if kind == "release":
-            if not CHANGELOG_VERSION_PATTERN.fullmatch(value):
-                errors.append("release changelog declaration must name a vX.Y.Z version")
-                continue
-        elif value.startswith("<") and value.endswith(">"):
-            errors.append("changelog declaration rationale must be non-placeholder text")
-            continue
-        declarations.append({"kind": kind, "value": value})
-    if len(candidates) == 0:
-        errors.append("pull request body must contain exactly one changelog declaration")
-    elif len(candidates) > 1:
-        errors.append("pull request body must contain exactly one changelog declaration")
-    if errors or len(declarations) != 1:
-        return None, errors
-    return declarations[0], []
+        if stripped.split()[0] == record:
+            candidates.append(stripped)
+    if len(candidates) != 1:
+        return None, [
+            "pull request body must contain exactly one repo-ops.changelog.v1 record"
+        ]
+    parsed, error = parse_record_line(candidates[0], record)
+    if parsed is None or error:
+        return None, ["malformed repo-ops.changelog.v1 record"]
+    schema_errors = validate_schema(
+        parsed,
+        (contract_root or CONTRACT_ROOT) / CONTRACT["records"][record]["schema"],
+        "changelog declaration",
+    )
+    if schema_errors:
+        return None, schema_errors
+    return {"kind": str(parsed["kind"]), "value": str(parsed["value"])}, []
 
 
 def _changelog_helpers() -> Any:
@@ -262,7 +252,7 @@ def normalize_text(value: str) -> str:
 def unfenced_lines(body: str) -> Iterator[str]:
     fence_character: str | None = None
     fence_length = 0
-    for line in body.splitlines():
+    for line in re.split(r"\r\n?|\n", body):
         fence_match = re.match(r" {0,3}(?P<marker>`{3,}|~{3,})(?P<rest>.*)$", line)
         if fence_character is not None:
             if fence_match:
@@ -270,7 +260,7 @@ def unfenced_lines(body: str) -> Iterator[str]:
                 if (
                     marker[0] == fence_character
                     and len(marker) >= fence_length
-                    and not fence_match.group("rest").strip()
+                    and re.fullmatch(r"[ \t]*", fence_match.group("rest"))
                 ):
                     fence_character = None
                     fence_length = 0
@@ -644,7 +634,7 @@ def validate_state(
             errors.append("issue authority requires a linked issue")
         elif authority_links[0]["issue"] != issue:
             errors.append("issue authority does not match the linked issue")
-    declaration, declaration_errors = parse_changelog_declaration(body)
+    declaration, declaration_errors = parse_changelog_declaration(body, contract_root)
     errors.extend(declaration_errors)
     errors.extend(
         validate_changelog_state(

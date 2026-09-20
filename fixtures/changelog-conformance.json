@@ -6,10 +6,10 @@
       "name": "required-owned-fragment",
       "input": {
         "route": "Related #3",
-        "declaration": "- Changelog: required — users need the release note",
+        "body": "## Summary\n\nPublish the contract.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added\n\nRelated #3\n",
         "files": [
           {
-            "filename": "changelog.d/3-repo-ops-v0.1.0.md",
+            "filename": "changelog.d/3-repo-ops.md",
             "status": "added",
             "content": "## Added\n- Publish the contract.\n"
           }
@@ -24,7 +24,7 @@
       "name": "required-missing-fragment",
       "input": {
         "route": "Related #3",
-        "declaration": "- Changelog: required — users need the release note",
+        "body": "## Summary\n\nPublish the contract.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added\n\nRelated #3\n",
         "files": []
       },
       "expected": {
@@ -36,7 +36,7 @@
       "name": "issue-ownership-mismatch",
       "input": {
         "route": "Related #3",
-        "declaration": "- Changelog: required — users need the release note",
+        "body": "## Summary\n\nPublish the contract.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added\n\nRelated #3\n",
         "files": [
           {
             "filename": "changelog.d/4-other.md",
@@ -54,7 +54,7 @@
       "name": "ordinary-direct-changelog-edit",
       "input": {
         "route": "Related #3",
-        "declaration": "- Changelog: not-required — no release note is needed",
+        "body": "## Summary\n\nNo release note.\n\nrepo-ops.changelog.v1 kind:not-required value:plan-only\n\nRelated #3\n",
         "files": [
           {
             "filename": "CHANGELOG.md",
@@ -71,7 +71,7 @@
       "name": "malformed-fragment-section",
       "input": {
         "route": "Related #3",
-        "declaration": "- Changelog: required — users need the release note",
+        "body": "## Summary\n\nPublish the contract.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added\n\nRelated #3\n",
         "files": [
           {
             "filename": "changelog.d/3-bad.md",
@@ -89,14 +89,14 @@
       "name": "release-consumes-fragments",
       "input": {
         "route": "Related #3",
-        "declaration": "- Changelog: release — v0.1.0",
+        "body": "## Summary\n\nFold the fragments.\n\nrepo-ops.changelog.v1 kind:release value:v0.1.0\n\nRelated #3\n",
         "files": [
           {
             "filename": "CHANGELOG.md",
             "status": "modified"
           },
           {
-            "filename": "changelog.d/3-repo-ops-v0.1.0.md",
+            "filename": "changelog.d/3-repo-ops.md",
             "status": "removed"
           }
         ]
@@ -104,6 +104,295 @@
       "expected": {
         "valid": true,
         "findings": []
+      }
+    },
+    {
+      "name": "prose-headings-punctuation-independence",
+      "input": {
+        "route": "Related #3",
+        "body": "## 摘要 — “policy”\n\nArbitrary prose… bullets:\n- café • em-dash —\n\n## Not a contract heading\n\nrepo-ops.changelog.v1 kind:required value:users-need-note\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "changelog.d/3-repo-ops.md",
+            "status": "added",
+            "content": "## Added\n- Publish the contract.\n"
+          }
+        ]
+      },
+      "expected": {
+        "valid": true,
+        "findings": []
+      }
+    },
+    {
+      "name": "indented-record",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nPublish the contract.\n\n    repo-ops.changelog.v1 kind:required value:fragment-added\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "changelog.d/3-repo-ops.md",
+            "status": "added",
+            "content": "## Added\n- Publish the contract.\n"
+          }
+        ]
+      },
+      "expected": {
+        "valid": true,
+        "findings": []
+      }
+    },
+    {
+      "name": "fenced-only",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nExample only.\n\n```text\nrepo-ops.changelog.v1 kind:required value:fragment-added\n```\n\nRelated #3\n",
+        "files": []
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["pull request body must contain exactly one repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "legacy-only",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nLegacy prose.\n\n- Changelog: required — users need the release note\n\nRelated #3\n",
+        "files": []
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["pull request body must contain exactly one repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "legacy-plus-valid",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nLegacy prose is ignored.\n\n- Changelog: required — users need the release note\n\nrepo-ops.changelog.v1 kind:required value:fragment-added\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "changelog.d/3-repo-ops.md",
+            "status": "added",
+            "content": "## Added\n- Publish the contract.\n"
+          }
+        ]
+      },
+      "expected": {
+        "valid": true,
+        "findings": []
+      }
+    },
+    {
+      "name": "valid-plus-malformed",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nTwo candidates.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added\nrepo-ops.changelog.v1 kind:required\n\nRelated #3\n",
+        "files": []
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["pull request body must contain exactly one repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "duplicate-records",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nDuplicates.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added\nrepo-ops.changelog.v1 kind:required value:fragment-added\n\nRelated #3\n",
+        "files": []
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["pull request body must contain exactly one repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "wrong-field-order",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nReordered fields.\n\nrepo-ops.changelog.v1 value:fragment-added kind:required\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["malformed repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "missing-field",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nMissing value.\n\nrepo-ops.changelog.v1 kind:required\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["malformed repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "duplicate-field",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nDuplicate kind.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added kind:required\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["malformed repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "unknown-field",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nUnknown field.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added extra:token\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["malformed repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "tab-separator",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nTab.\n\nrepo-ops.changelog.v1\tkind:required value:fragment-added\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["malformed repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "multiple-spaces",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nMultiple spaces.\n\nrepo-ops.changelog.v1  kind:required value:fragment-added\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["malformed repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "trailing-token",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nTrailing token.\n\nrepo-ops.changelog.v1 kind:required value:fragment-added leftover\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["malformed repo-ops.changelog.v1 record"]
+      }
+    },
+    {
+      "name": "invalid-kind",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nInvalid kind.\n\nrepo-ops.changelog.v1 kind:optional value:fragment-added\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["changelog declaration"]
+      }
+    },
+    {
+      "name": "invalid-reason",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nInvalid reason.\n\nrepo-ops.changelog.v1 kind:required value:Not_Valid\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["changelog declaration"]
+      }
+    },
+    {
+      "name": "placeholder-value",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nPlaceholder.\n\nrepo-ops.changelog.v1 kind:not-required value:replace-me\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["changelog declaration"]
+      }
+    },
+    {
+      "name": "invalid-release-version",
+      "input": {
+        "route": "Related #3",
+        "body": "## Summary\n\nInvalid release version.\n\nrepo-ops.changelog.v1 kind:release value:v01.0.0\n\nRelated #3\n",
+        "files": [
+          {
+            "filename": "CHANGELOG.md",
+            "status": "modified"
+          }
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "findings": ["changelog declaration"]
       }
     }
   ]
