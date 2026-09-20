@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go without cache
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -38,13 +39,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${RUNNER_TEMP}/bench"
+          measured_sha="$(git rev-parse HEAD)"
           start_ns="$(date +%s%N)"
           set +e
           go test ./...
           status=$?
           set -e
           end_ns="$(date +%s%N)"
-          START_NS="${start_ns}" END_NS="${end_ns}" STATUS="${status}" python3 - <<'PY'
+          START_NS="${start_ns}" END_NS="${end_ns}" STATUS="${status}" MEASURED_SHA="${measured_sha}" python3 - <<'PY'
           import json
           import os
           from pathlib import Path
@@ -53,7 +55,7 @@ jobs:
           end_ns = int(os.environ["END_NS"])
           record = {
               "sample": int(os.environ["SAMPLE"]),
-              "sha": os.environ["GITHUB_SHA"],
+              "sha": os.environ["MEASURED_SHA"],
               "run_id": os.environ["GITHUB_RUN_ID"],
               "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
               "job": "go-clean-ci-" + os.environ["SAMPLE"],
