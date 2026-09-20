@@ -626,7 +626,7 @@ class ValidatorConformanceTests(unittest.TestCase):
             self.assertLess(text.rindex('-f "name=contract"'), text.rindex('-f "name=merge approval"'))
             self.assertIn("if: always()", text)
             self.assertEqual(text.count("continue-on-error: true"), 2)
-        parsed_reusable = validator.yaml.safe_load(workflow)
+        parsed_reusable = validator.yaml.load(workflow, Loader=validator.yaml.BaseLoader)
         self.assertIn("workflow_call", parsed_reusable["on"])
         self.assertIn("contract-ref:", workflow)
         self.assertIn("head-sha:", workflow)
@@ -646,7 +646,7 @@ class ValidatorConformanceTests(unittest.TestCase):
         self.assertIn('-f "head_sha=${HEAD_SHA}"', policy_workflow)
         self.assertNotIn("plan-round", (self.contract_root / "merge-review.schema.json").read_text(encoding="utf-8"))
         self.assertNotIn("round_limits", validator.json.dumps(validator.CONTRACT))
-        parsed_policy = validator.yaml.safe_load(policy_workflow)
+        parsed_policy = validator.yaml.load(policy_workflow, Loader=validator.yaml.BaseLoader)
         publish_steps = parsed_policy["jobs"]["publish"]["steps"]
         authorize = next(step for step in publish_steps if step.get("id") == "authorize")
         self.assertIn("authorized=true", authorize["run"])
