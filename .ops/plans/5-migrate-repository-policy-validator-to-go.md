@@ -1,7 +1,7 @@
 # Migrate repository policy validator to Go
 
 Issue: #5
-Current v1 intent: `sha256:ab01092464d6f25e1385604c238a0fb4a9eee37aa3c58c912cb616f07e21651c`
+Current v1 intent: `sha256:1fe86d9dba7114bb75df62a4b31048ba11a9bb9eac4f3bc10fee17882cf71e11`
 Supersedes: `sha256:3c5898cf216583590419b74147ed57bf4af27a762d3ee5a470d93036a6750cb7`
 Frozen production oracle: `fe229702e88cda5e1fb7ad142112edb50fd57c82` (unconditional; `origin/main` after PR #9)
 
