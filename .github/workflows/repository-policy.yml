@@ -24,14 +24,6 @@ jobs:
       issues: read
       pull-requests: read
     steps:
-      - name: Validate immutable contract reference
-        env:
-          CONTRACT_REF: ${{ inputs['contract-ref'] }}
-        run: |
-          [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "contract-ref must be a full commit SHA" >&2
-            exit 1
-          }
       - name: Revoke stale exact-head results
         env:
           GH_TOKEN: ${{ github.token }}
@@ -47,6 +39,14 @@ jobs:
               -f "output[title]=Validation pending" \
               -f "output[summary]=Previous policy result revoked before candidate validation."
           done
+      - name: Validate immutable contract reference
+        env:
+          CONTRACT_REF: ${{ inputs['contract-ref'] }}
+        run: |
+          [[ "$CONTRACT_REF" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "contract-ref must be a full commit SHA" >&2
+            exit 1
+          }
       - name: Fetch trusted validator
         env:
           CONTRACT_REF: ${{ inputs['contract-ref'] }}

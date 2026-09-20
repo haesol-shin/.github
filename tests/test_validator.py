@@ -628,6 +628,11 @@ class ValidatorConformanceTests(unittest.TestCase):
             self.assertEqual(text.count("continue-on-error: true"), 2)
         parsed_reusable = validator.yaml.load(workflow, Loader=validator.yaml.BaseLoader)
         self.assertIn("workflow_call", parsed_reusable["on"])
+        self.assertLess(
+            workflow.index("Revoke stale exact-head results"),
+            workflow.index("Validate immutable contract reference"),
+        )
+
         self.assertIn("contract-ref:", workflow)
         self.assertIn("head-sha:", workflow)
         self.assertIn("uses: ./.repo-ops/actions/repository-policy", policy_workflow)
