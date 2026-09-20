@@ -1,6 +1,6 @@
 {
   "oracle_commit": "654d81f68ee1db5baf33c89016d3ddb659e98220",
-  "go_commit": "aee247d52d50ebbcd3e90185db72c2b0ae42e061",
+  "go_commit": "36c82f78f27fb8645b491139bc820ed19f3a4b97",
   "local_cold_start_ms": {
     "python": {
       "samples": [
@@ -43,16 +43,16 @@
     },
     "go": {
       "samples": [
-        28000,
-        27000,
-        28000,
-        24000,
-        31000
+        26000,
+        22000,
+        29000,
+        26000,
+        26000
       ],
-      "p50": 28000,
-      "p95": 31000,
+      "p50": 26000,
+      "p95": 29000,
       "n": 5,
-      "source": "5-go-validator-benchmark.yml run 35540025690; jobs 106155886930, 106155886823, 106155886777, 106155886832, 106155886844"
+      "source": "5-go-validator-benchmark.yml run 35540818238; jobs 106158007305, 106158007184, 106158007152, 106158007138, 106158006985"
     }
   },
   "peak_rss_kib": {
@@ -102,11 +102,11 @@
     "Local host: Windows-11-10.0.26200-SP0 python=3.12.10 go=go version go1.27.1 windows/amd64 uv=uv 0.11.18 (e32666915 2026-06-01 x86_64-pc-windows-msvc). OS file cache was not dropped.",
     "Local Windows/macOS numbers are not GitHub ubuntu-latest clean-CI samples.",
     "clean_ci_wall_ms.python is the GitHub job duration for production `quality` run 35538127563 attempts 2-6. Before every rerun, the single matching `setup-uv` cache was deleted; every attempt logged `No GitHub Actions cache found for key`. GitHub job timestamps have one-second resolution.",
-    "clean_ci_wall_ms.go is the GitHub job duration for the five empty-cache matrix jobs in isolated run 35540025690. The workflow disables setup-go caching, assigns a unique empty GOMODCACHE and GOCACHE to every sample, checks out the recorded head explicitly, and uploads the measured head plus inner-command timing. GitHub job timestamps have one-second resolution.",
+    "clean_ci_wall_ms.go is the GitHub job duration for the five empty-cache matrix jobs in isolated run 35540818238. The workflow disables setup-go caching, assigns a unique empty GOMODCACHE and GOCACHE to every sample, checks out the recorded head explicitly, and uploads the measured head plus inner-command timing. GitHub job timestamps have one-second resolution.",
     "workflow_steps counts explicit `.github/workflows/policy.yml` job `publish` steps in the Stage 2 tree (8). Proposed Stage 3 keeps those 8 steps and swaps composite internals to build+exec the base-owned Go binary with the same `--event`/`--check` flags. The benchmark-only job is not counted.",
     "production_dependencies.python are the plan's trusted-path entries. production_dependencies.go lists direct require directives in go.mod only (not test-only or benchmark tooling). Current inventory: gopkg.in/yaml.v3@v3.0.1.",
-    "go_commit is the exact measured implementation head aee247d52d50ebbcd3e90185db72c2b0ae42e061; the following commit updates evidence only.",
-    "Go clean-CI p95 is 31000 ms versus Python's 9000 ms. The isolated Go job includes checkout, setup-go, downloading gopkg.in/yaml.v3 into an empty module cache, compiling every package into an empty build cache, and artifact upload; this measured regression is advisory and does not retain Python after Stage 3.",
+    "go_commit is the exact measured implementation head 36c82f78f27fb8645b491139bc820ed19f3a4b97; the following commit updates evidence only.",
+    "Go clean-CI p95 is 29000 ms versus Python's 9000 ms. The isolated Go job includes checkout, setup-go, downloading gopkg.in/yaml.v3 into an empty module cache, compiling every package into an empty build cache, and artifact upload; this measured regression is advisory and does not retain Python after Stage 3.",
     "Benchmarks are evidence only and do not authorize retaining Python after Stage 3."
   ]
 }
