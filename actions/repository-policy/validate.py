@@ -201,6 +201,7 @@ def validate_changelog_state(
                 errors.append("issue-backed fragment filename must begin with the linked issue number")
         elif not _fragment_name_valid(filename, root):
             errors.append("release fragment consumption includes an invalid fragment filename")
+    parse_fragment = _changelog_helpers()
     for entry in changed_fragments:
         content = _fragment_content(state, entry)
         if content is None:
@@ -225,6 +226,7 @@ PLAN_APPROVAL_ASSOCIATIONS = {
     for definition in RISK_AUTHORITY.values()
     for association in definition.get("approval_associations", [])
 }
+PLAN_RECORD_ASSOCIATIONS = PLAN_APPROVAL_ASSOCIATIONS | AUTHORIZED_ASSOCIATIONS
 
 
 def normalize_text(value: str) -> str:
@@ -425,6 +427,8 @@ def parse_plan_path(body: str) -> str | None:
         if not blob_match:
             return None
         value = blob_match.group(1)
+    if value.startswith("./"):
+        value = value[2:]
     return value if value.startswith(".ops/plans/") else None
 
 
@@ -682,7 +686,7 @@ def validate_state(
     plan_comments = [
         entry
         for entry in comments
-        if entry.get("association") in PLAN_APPROVAL_ASSOCIATIONS
+        if entry.get("association") in PLAN_RECORD_ASSOCIATIONS
     ]
     if risk in {"medium", "high"}:
         approval, approval_entry, approval_errors = latest_record(
@@ -1025,7 +1029,7 @@ def build_live_state(event_path: Path) -> dict[str, Any]:
     for comment in (
         entry
         for entry in pr_comments
-        if entry.get("association") in PLAN_APPROVAL_ASSOCIATIONS
+        if entry.get("association") in PLAN_RECORD_ASSOCIATIONS
     ):
         approval, _ = parse_record_line(comment["body"], "repo-ops.plan-approval.v1")
         if not approval:

@@ -12,6 +12,7 @@ from typing import Iterable
 
 ALLOWED_SECTIONS = ("Added", "Changed", "Deprecated", "Removed", "Fixed", "Security")
 _SECTION_PATTERN = re.compile(r"^## (?P<section>Added|Changed|Deprecated|Removed|Fixed|Security)$")
+_VERSION_PATTERN = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
 _VERSION_HEADING_PATTERN = re.compile(
     r"^## (?:\[)?(?P<version>v[0-9]+\.[0-9]+\.[0-9]+)(?:\])?(?: - .*)?$"
 )

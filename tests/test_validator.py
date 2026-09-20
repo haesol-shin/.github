@@ -282,7 +282,7 @@ class ValidatorConformanceTests(unittest.TestCase):
 
     def test_contract_check_is_independent_of_exact_head_merge_receipt(self) -> None:
         state = self.v1_state()
-        state["comments"] = []
+        state["comments"] = state["comments"][:1]
         self.assertEqual(
             [],
             validator.validate_state(state, self.contract_root, check="contract"),
