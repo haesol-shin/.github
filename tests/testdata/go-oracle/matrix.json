@@ -1,0 +1,327 @@
+{
+  "oracle_commit": "654d81f68ee1db5baf33c89016d3ddb659e98220",
+  "cases": [
+    {
+      "fixture": "invalid-diff-digest.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "merge-review diff does not match the current pull request"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-diff-digest.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "invalid-diff-digest.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "merge-review diff does not match the current pull request"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-direct-changelog.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "ordinary pull requests must not edit CHANGELOG.md"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-direct-changelog.json",
+      "check": "contract",
+      "exit": 1,
+      "findings": [
+        "ordinary pull requests must not edit CHANGELOG.md"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-direct-changelog.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "contract check did not succeed; merge approval is blocked",
+        "ordinary pull requests must not edit CHANGELOG.md"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-deletion.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "fragment deletion is reserved for release changelog declarations"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-deletion.json",
+      "check": "contract",
+      "exit": 1,
+      "findings": [
+        "fragment deletion is reserved for release changelog declarations"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-deletion.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "contract check did not succeed; merge approval is blocked",
+        "fragment deletion is reserved for release changelog declarations"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-owner.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "issue-backed fragment filename must begin with the linked issue number"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-owner.json",
+      "check": "contract",
+      "exit": 1,
+      "findings": [
+        "issue-backed fragment filename must begin with the linked issue number"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-owner.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "contract check did not succeed; merge approval is blocked",
+        "issue-backed fragment filename must begin with the linked issue number"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-section.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "changelog.d/42-validator.md:1: content must follow an allowed section heading"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-section.json",
+      "check": "contract",
+      "exit": 1,
+      "findings": [
+        "changelog.d/42-validator.md:1: content must follow an allowed section heading"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-fragment-section.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "contract check did not succeed; merge approval is blocked",
+        "changelog.d/42-validator.md:1: content must follow an allowed section heading"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-missing-field.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "repo-ops.merge-review.v1 fields must appear in this order: verdict risk intent plan base head diff runtime model",
+        "no merge-ready receipt was found"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-missing-field.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "invalid-missing-field.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "repo-ops.merge-review.v1 fields must appear in this order: verdict risk intent plan base head diff runtime model",
+        "no merge-ready receipt was found"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-required-missing.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "required changelog declarations need an added or modified fragment"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-required-missing.json",
+      "check": "contract",
+      "exit": 1,
+      "findings": [
+        "required changelog declarations need an added or modified fragment"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-required-missing.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "contract check did not succeed; merge approval is blocked",
+        "required changelog declarations need an added or modified fragment"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-stale-head.json",
+      "check": "all",
+      "exit": 1,
+      "findings": [
+        "merge-review head does not match the current pull request"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "invalid-stale-head.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "invalid-stale-head.json",
+      "check": "merge-approval",
+      "exit": 1,
+      "findings": [
+        "merge-review head does not match the current pull request"
+      ],
+      "check_conclusion": "failure"
+    },
+    {
+      "fixture": "valid-high.json",
+      "check": "all",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-high.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-high.json",
+      "check": "merge-approval",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-low-direct.json",
+      "check": "all",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-low-direct.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-low-direct.json",
+      "check": "merge-approval",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-required-fragment.json",
+      "check": "all",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-required-fragment.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-required-fragment.json",
+      "check": "merge-approval",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-v1-historical-discussion.json",
+      "check": "all",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-v1-historical-discussion.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-v1-historical-discussion.json",
+      "check": "merge-approval",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-v1-related.json",
+      "check": "all",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-v1-related.json",
+      "check": "contract",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    },
+    {
+      "fixture": "valid-v1-related.json",
+      "check": "merge-approval",
+      "exit": 0,
+      "findings": [],
+      "check_conclusion": "success"
+    }
+  ]
+}

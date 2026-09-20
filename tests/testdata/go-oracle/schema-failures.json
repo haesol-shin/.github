@@ -1,0 +1,453 @@
+{
+  "oracle_commit": "654d81f68ee1db5baf33c89016d3ddb659e98220",
+  "cases": [
+    {
+      "schema": "changelog-declaration.schema.json",
+      "schema_id": "https://raw.githubusercontent.com/haesol-shin/.github/v0.1.0/contracts/v0.1.0/changelog-declaration.schema.json",
+      "label": "changelog declaration",
+      "empty_object": [
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        }
+      ],
+      "required_omissions": [
+        {
+          "omitted": "record",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "kind",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "value",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "intent.schema.json",
+      "schema_id": "https://raw.githubusercontent.com/haesol-shin/.github/v0.1.0/contracts/v0.1.0/intent.schema.json",
+      "label": "repo-ops.intent.v1",
+      "empty_object": [
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        }
+      ],
+      "required_omissions": [
+        {
+          "omitted": "record",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "decision",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "risk",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "intent",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "supersedes",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "merge-review.schema.json",
+      "schema_id": "https://raw.githubusercontent.com/haesol-shin/.github/v0.1.0/contracts/v0.1.0/merge-review.schema.json",
+      "label": "merge-review receipt",
+      "empty_object": [
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        }
+      ],
+      "required_omissions": [
+        {
+          "omitted": "record",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "verdict",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "risk",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "intent",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "plan",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "base",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "head",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "diff",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "runtime",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "model",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "plan-approval.schema.json",
+      "schema_id": "https://raw.githubusercontent.com/haesol-shin/.github/v0.1.0/contracts/v0.1.0/plan-approval.schema.json",
+      "label": "plan approval",
+      "empty_object": [
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        }
+      ],
+      "required_omissions": [
+        {
+          "omitted": "record",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "decision",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "risk",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "issue",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "intent",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "plan",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "plan-commit",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "repository-policy.schema.json",
+      "schema_id": "https://raw.githubusercontent.com/haesol-shin/.github/v0.1.0/contracts/v0.1.0/repository-policy.schema.json",
+      "label": "repository policy",
+      "empty_object": [
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        },
+        {
+          "instance_path": "",
+          "keyword": "required"
+        }
+      ],
+      "required_omissions": [
+        {
+          "omitted": "contract",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "profile",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "quality",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "review",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "changelog",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        },
+        {
+          "omitted": "release",
+          "failures": [
+            {
+              "instance_path": "",
+              "keyword": "required"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

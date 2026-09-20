@@ -1,0 +1,6 @@
+{
+  "extends": "base.json",
+  "replace": {
+    "nested.missing.x": 1
+  }
+}

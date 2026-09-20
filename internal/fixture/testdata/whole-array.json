@@ -1,0 +1,7 @@
+{
+  "extends": "base.json",
+  "replace": {
+    "tags": ["new", "also"]
+  },
+  "expected": null
+}

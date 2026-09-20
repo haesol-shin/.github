@@ -1,0 +1,6 @@
+{
+  "extends": "base.json",
+  "replace": {
+    "name.0": "x"
+  }
+}
