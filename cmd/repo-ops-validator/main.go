@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -51,11 +52,12 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string, li
 	fs := flag.NewFlagSet("repo-ops-validator", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "usage: repo-ops-validator --fixture PATH | --event PATH [--check all|contract|merge-approval]\n")
+		fmt.Fprintf(stderr, "usage: repo-ops-validator --fixture PATH | --event PATH [--check all|contract|merge-approval] [--digest-out PATH]\n")
 	}
 	fixturePath := fs.String("fixture", "", "fixture state JSON")
 	eventPath := fs.String("event", "", "GitHub event JSON")
 	checkName := fs.String("check", "all", "all, contract, or merge-approval")
+	digestOut := fs.String("digest-out", "", "write collected plan and diff digests as JSON")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -98,6 +100,11 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string, li
 	if err != nil {
 		return emitFindings(stdout, getenv, []string{err.Error()}, *checkName)
 	}
+	if strings.TrimSpace(*digestOut) != "" {
+		if err := writeDigestEvidence(*digestOut, state); err != nil {
+			return emitFindings(stdout, getenv, []string{err.Error()}, *checkName)
+		}
+	}
 
 	var findings []string
 	if check == evaluate.CheckMergeApproval {
@@ -124,6 +131,23 @@ func parseCheck(name string) (evaluate.Check, error) {
 		var zero evaluate.Check
 		return zero, fmt.Errorf("invalid --check %q (want all, contract, or merge-approval)", name)
 	}
+}
+
+func writeDigestEvidence(path string, state map[string]any) error {
+	pullRequest, _ := state["pull_request"].(map[string]any)
+	evidence := map[string]any{
+		"plan_digest": state["plan_digest"],
+		"diff_digest": pullRequest["diff_digest"],
+	}
+	data, err := json.Marshal(evidence)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write digest evidence: %w", err)
+	}
+	return nil
 }
 
 func emitFindings(stdout io.Writer, getenv func(string) string, findings []string, check string) int {

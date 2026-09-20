@@ -416,8 +416,9 @@ def capture(
         child["GITHUB_STEP_SUMMARY"] = str(summary)
     else:
         child.pop("GITHUB_STEP_SUMMARY", None)
+    digest_path = dest / "digests.json"
     completed = subprocess.run(
-        cmd,
+        [*cmd, "--digest-out", str(digest_path)],
         cwd=cwd,
         env=child,
         stdout=subprocess.PIPE,
@@ -430,19 +431,16 @@ def capture(
     write_text(dest / "stderr.txt", stderr)
     write_text(dest / "exit.txt", f"{completed.returncode}\n")
     payload = semantic(completed.returncode, parse_findings(stdout))
+    if not digest_path.is_file():
+        raise SystemExit(f"candidate did not write digest evidence: {digest_path}")
+    digests = json.loads(digest_path.read_text(encoding="utf-8"))
+    payload["plan_digest"] = digests.get("plan_digest")
+    payload["diff_digest"] = digests.get("diff_digest")
     write_json(dest / "semantic.json", payload)
     scan_secret(stdout, stderr, extra=summary if step_summary else None)
     return payload
 
 
-def expected_shape(row: dict[str, Any], plan_digest: str, diff_digest: str) -> dict[str, Any]:
-    return {
-        "exit": row["exit"],
-        "findings": row["findings"],
-        "check_conclusion": row["check_conclusion"],
-        "plan_digest": plan_digest,
-        "diff_digest": diff_digest,
-    }
 
 
 def compare_rows(label: str, observed: dict[str, Any], expected: dict[str, Any]) -> list[str]:
@@ -505,7 +503,7 @@ def run_bundle(
                     dest=out / "summary-scan" / impl / rel,
                     step_summary=True,
                 )
-                observed[impl][check] = expected_shape(row, plan_digest, hashed)
+                observed[impl][check] = row
         if unmatched:
             errors.append(f"{bundle.name} unmatched HTTP: {unmatched}")
         del seen
