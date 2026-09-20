@@ -27,5 +27,9 @@ Rollback: <exact reversal or mitigation>
 
 ## Related
 
-Fixes #<issue> | Direct low-risk PR: <rationale>
+Choose exactly one route, then replace the next line with one unindented entry
+without a list marker or backticks:
+
+<Fixes #issue | Closes #issue | Related #issue | Direct low-risk PR: rationale>
+
 Plan: <link | none>
