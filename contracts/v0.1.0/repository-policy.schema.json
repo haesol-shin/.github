@@ -18,7 +18,7 @@
       "required": ["check", "commands"],
       "properties": {
         "check": {
-          "const": "CI / quality"
+          "const": "quality"
         },
         "commands": {
           "type": "array",

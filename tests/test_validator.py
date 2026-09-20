@@ -454,7 +454,7 @@ class ValidatorConformanceTests(unittest.TestCase):
     def test_valid_high_risk_route(self) -> None:
         self.assertEqual([], self.findings("valid-high.json"))
 
-    def test_every_required_pull_request_heading_is_enforced(self) -> None:
+    def test_generic_headings_are_advisory(self) -> None:
         state, _ = validator.load_fixture(self.fixtures / "valid-low-direct.json")
         for heading in validator.CONTRACT["pull_request"]["required_headings"]:
             with self.subTest(heading=heading):
@@ -462,46 +462,20 @@ class ValidatorConformanceTests(unittest.TestCase):
                 candidate["pull_request"]["body"] = candidate["pull_request"]["body"].replace(
                     heading, f"Removed {heading}", 1
                 )
-                self.assertIn(
-                    f"pull request body is missing {heading}",
-                    validator.validate_state(candidate, self.contract_root),
-                )
+                self.assertEqual([], validator.validate_state(candidate, self.contract_root))
 
-    def test_every_required_issue_heading_is_enforced(self) -> None:
-        state, _ = validator.load_fixture(self.fixtures / "valid-high.json")
+        issue_state, _ = validator.load_fixture(self.fixtures / "valid-high.json")
         for heading in validator.CONTRACT["issue"]["required_headings"]:
-            with self.subTest(heading=heading):
-                candidate = copy.deepcopy(state)
+            with self.subTest(issue_heading=heading):
+                candidate = copy.deepcopy(issue_state)
                 candidate["issue_body"] = candidate["issue_body"].replace(
                     heading, f"Removed {heading}", 1
                 )
-                self.assertIn(
-                    f"linked issue body is missing {heading}",
-                    validator.validate_state(candidate, self.contract_root),
-                )
+                self.assertEqual([], validator.validate_state(candidate, self.contract_root))
 
-    def test_repository_specific_headings_are_allowed(self) -> None:
-        state, _ = validator.load_fixture(self.fixtures / "valid-high.json")
-        state["issue_body"] = state["issue_body"].replace(
-            "## Context",
-            "## Security boundary\n\nNo production credentials.\n\n## Context",
-            1,
-        )
-        state["pull_request"]["body"] = state["pull_request"]["body"].replace(
-            "## Verification",
-            "## Contract impact\n\nNo public schema change.\n\n## Verification",
-            1,
-        )
-        self.assertEqual([], validator.validate_state(state, self.contract_root))
-
-    def test_required_headings_are_unique_and_ordered(self) -> None:
-        state, _ = validator.load_fixture(self.fixtures / "valid-low-direct.json")
         duplicate = copy.deepcopy(state)
         duplicate["pull_request"]["body"] += "\n## Summary\n\nDuplicate.\n"
-        self.assertIn(
-            "pull request body contains duplicate ## Summary",
-            validator.validate_state(duplicate, self.contract_root),
-        )
+        self.assertEqual([], validator.validate_state(duplicate, self.contract_root))
 
         reordered = copy.deepcopy(state)
         body = reordered["pull_request"]["body"]
@@ -509,10 +483,7 @@ class ValidatorConformanceTests(unittest.TestCase):
         body = body.replace("## Changes", "## Summary", 1)
         body = body.replace("## Temporary", "## Changes", 1)
         reordered["pull_request"]["body"] = body
-        self.assertIn(
-            "pull request body required headings must appear in contract order",
-            validator.validate_state(reordered, self.contract_root),
-        )
+        self.assertEqual([], validator.validate_state(reordered, self.contract_root))
 
     def test_fenced_template_examples_are_not_counted_as_headings(self) -> None:
         state, _ = validator.load_fixture(self.fixtures / "valid-high.json")
@@ -631,19 +602,33 @@ class ValidatorConformanceTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "repository-policy.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("name: contract", workflow)
-        self.assertIn("name: merge approval", workflow)
-        self.assertIn('-f "name=contract"', workflow)
-        self.assertIn('-f "name=merge approval"', workflow)
-        self.assertIn("needs: [revoke, contract]", workflow)
-        self.assertIn("if: ${{ always() }}", workflow)
         policy_workflow = (ROOT / ".github" / "workflows" / "policy.yml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("name: contract", policy_workflow)
-        self.assertIn("name: merge approval", policy_workflow)
-        self.assertIn('-f "name=contract"', policy_workflow)
-        self.assertIn('-f "name=merge approval"', policy_workflow)
+        for text in (workflow, policy_workflow):
+            self.assertIn("name: publish", text)
+            self.assertNotIn("name: contract", text)
+            self.assertNotIn("name: merge approval", text)
+            self.assertIn('-f "name=contract"', text)
+            self.assertIn('-f "name=merge approval"', text)
+            self.assertNotIn("needs: [revoke, contract]", text)
+            self.assertNotIn("needs: contract", text)
+            revoke_at = text.index("Revoke stale exact-head results")
+            uses = [
+                match.start()
+                for match in __import__("re").finditer(
+                    r"uses: \./\.repo-ops/actions/repository-policy",
+                    text,
+                )
+            ]
+            self.assertGreaterEqual(len(uses), 2)
+            self.assertTrue(all(revoke_at < index for index in uses))
+            self.assertLess(text.rindex('-f "name=contract"'), text.rindex('-f "name=merge approval"'))
+            self.assertIn("if: always()", text)
+            self.assertEqual(text.count("continue-on-error: true"), 2)
+        self.assertIn("on: workflow_call", workflow)
+        self.assertIn("contract-ref:", workflow)
+        self.assertIn("head-sha:", workflow)
         self.assertIn("uses: ./.repo-ops/actions/repository-policy", policy_workflow)
         self.assertNotIn("uses: ./.github/workflows/repository-policy.yml", policy_workflow)
         self.assertIn("repo-ops.intent.v1", policy_workflow)
@@ -651,7 +636,6 @@ class ValidatorConformanceTests(unittest.TestCase):
         self.assertIn("Intent accepted.", policy_workflow)
         self.assertNotIn("needs: prepare", policy_workflow)
         self.assertNotIn("needs: revoke", policy_workflow)
-        self.assertIn("needs: contract", policy_workflow)
         self.assertNotIn("/issues/${ISSUE_NUMBER}/pulls", policy_workflow)
         self.assertIn("/pulls?state=open&per_page=100", policy_workflow)
         quality_workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
@@ -659,7 +643,23 @@ class ValidatorConformanceTests(unittest.TestCase):
         )
         self.assertIn("  quality:\n    name: quality", quality_workflow)
         self.assertIn('-f "head_sha=${HEAD_SHA}"', policy_workflow)
-        self.assertIn('-f "conclusion=${conclusion}"', policy_workflow)
+        self.assertNotIn("plan-round", (self.contract_root / "merge-review.schema.json").read_text(encoding="utf-8"))
+        self.assertNotIn("round_limits", validator.json.dumps(validator.CONTRACT))
+
+    def test_composite_action_manifest_loads_as_typed_yaml(self) -> None:
+        path = ROOT / "actions" / "repository-policy" / "action.yml"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn(
+            'description: "Stable evaluator surface: contract or merge-approval"',
+            text,
+        )
+        manifest = validator.yaml.safe_load(text)
+        self.assertEqual("composite", manifest["runs"]["using"])
+        self.assertIn("check", manifest["inputs"])
+        self.assertIsInstance(manifest["inputs"]["check"]["description"], str)
+        for step in manifest["runs"]["steps"]:
+            if "run" in step:
+                self.assertIn("shell", step)
 
     def test_record_rejects_noncanonical_spacing(self) -> None:
         record, error = validator.parse_record_line(
