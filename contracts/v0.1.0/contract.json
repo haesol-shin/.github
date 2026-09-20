@@ -1,10 +1,18 @@
 {
   "id": "repo-ops/v0.1.0",
   "issue": {
-    "required_headings": ["## Problem", "## Desired outcome"]
+    "heading_level": 2,
+    "required_heading_occurrences": 1,
+    "required_heading_order": true,
+    "required_headings": ["## Problem", "## Desired outcome", "## Work", "## Acceptance", "## Non-goals", "## Context"],
+    "allow_additional_headings": true
   },
   "pull_request": {
-    "required_headings": ["## Summary", "## Changes", "## Verification", "## Related"]
+    "heading_level": 2,
+    "required_heading_occurrences": 1,
+    "required_heading_order": true,
+    "required_headings": ["## Summary", "## Changes", "## Impact", "## Verification", "## Risk and rollback", "## Related"],
+    "allow_additional_headings": true
   },
   "round_limits": {
     "low": {

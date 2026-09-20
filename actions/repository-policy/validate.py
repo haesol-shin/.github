@@ -21,7 +21,6 @@ from jsonschema import Draft202012Validator
 CONTRACT_ROOT = Path(__file__).resolve().parents[2] / "contracts" / "v0.1.0"
 CONTRACT = json.loads((CONTRACT_ROOT / "contract.json").read_text(encoding="utf-8"))
 CONTRACT_VERSION = CONTRACT["id"]
-REQUIRED_HEADINGS = tuple(CONTRACT["pull_request"]["required_headings"])
 ROUND_LIMITS = CONTRACT["round_limits"]
 RECORD_ORDERS = {
     record: tuple(definition["field_order"])
@@ -33,6 +32,47 @@ AUTHORIZED_ASSOCIATIONS = {"OWNER", "MEMBER"}
 def normalize_text(value: str) -> str:
     normalized = value.replace("\r\n", "\n").replace("\r", "\n").rstrip()
     return f"{normalized}\n"
+
+
+def markdown_headings(body: str, level: int) -> list[str]:
+    prefix = "#" * level
+    return [
+        line.rstrip()
+        for line in body.splitlines()
+        if re.fullmatch(rf"{re.escape(prefix)}(?!#)[ \t]+\S.*", line.rstrip())
+    ]
+
+
+def validate_heading_contract(
+    body: str,
+    definition: dict[str, Any],
+    label: str,
+) -> list[str]:
+    headings = markdown_headings(body, int(definition["heading_level"]))
+    required = definition["required_headings"]
+    required_occurrences = int(definition["required_heading_occurrences"])
+    errors: list[str] = []
+
+    for heading in required:
+        count = headings.count(heading)
+        if count < required_occurrences:
+            errors.append(f"{label} is missing {heading}")
+        elif count > required_occurrences:
+            errors.append(f"{label} contains duplicate {heading}")
+
+    if definition.get("required_heading_order", False) and all(
+        headings.count(heading) == required_occurrences for heading in required
+    ):
+        positions = [headings.index(heading) for heading in required]
+        if positions != sorted(positions):
+            errors.append(f"{label} required headings must appear in contract order")
+
+    if not definition.get("allow_additional_headings", False):
+        extras = [heading for heading in headings if heading not in required]
+        if extras:
+            errors.append(f"{label} contains unsupported headings: {', '.join(extras)}")
+
+    return errors
 
 
 def canonical_digest(payload: dict[str, Any]) -> str:
@@ -185,9 +225,9 @@ def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
 
     pull_request = state.get("pull_request") or {}
     body = pull_request.get("body") or ""
-    for heading in REQUIRED_HEADINGS:
-        if heading not in body:
-            errors.append(f"pull request body is missing {heading}")
+    errors.extend(
+        validate_heading_contract(body, CONTRACT["pull_request"], "pull request body")
+    )
 
     risk = parse_risk(body)
     if risk is None:
@@ -203,9 +243,9 @@ def validate_state(state: dict[str, Any], contract_root: Path) -> list[str]:
     comments = state.get("comments") or []
     if issue is not None:
         issue_body = state.get("issue_body") or ""
-        for heading in CONTRACT["issue"]["required_headings"]:
-            if heading not in issue_body:
-                errors.append(f"linked issue body is missing {heading}")
+        errors.extend(
+            validate_heading_contract(issue_body, CONTRACT["issue"], "linked issue body")
+        )
     reviews = state.get("reviews") or []
     authorized_comments = [
         entry for entry in comments if entry.get("association") in AUTHORIZED_ASSOCIATIONS
