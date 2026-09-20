@@ -327,11 +327,11 @@ class ValidatorConformanceTests(unittest.TestCase):
             root = Path(directory)
             fragments = root / "changelog.d"
             fragments.mkdir()
-            (fragments / "z-last.md").write_text(
+            (fragments / "3-z-last.md").write_text(
                 "## Added\n- Z entry.\n",
                 encoding="utf-8",
             )
-            (fragments / "a-first.md").write_text(
+            (fragments / "3-a-first.md").write_text(
                 "## Added\n- A entry.\n",
                 encoding="utf-8",
             )
@@ -344,7 +344,7 @@ class ValidatorConformanceTests(unittest.TestCase):
                 version="v0.1.0",
                 date="2026-09-21",
             )
-            self.assertEqual(["a-first.md", "z-last.md"], [path.name for path in consumed])
+            self.assertEqual(["3-a-first.md", "3-z-last.md"], [path.name for path in consumed])
             self.assertEqual(
                 "## [v0.1.0] - 2026-09-21\n\n"
                 "### Added\n"
@@ -352,11 +352,11 @@ class ValidatorConformanceTests(unittest.TestCase):
                 "- Z entry.\n",
                 changelog_path.read_text(encoding="utf-8"),
             )
-            self.assertFalse((fragments / "a-first.md").exists())
-            self.assertFalse((fragments / "z-last.md").exists())
+            self.assertFalse((fragments / "3-a-first.md").exists())
+            self.assertFalse((fragments / "3-z-last.md").exists())
             self.assertEqual("keep", unrelated.read_text(encoding="utf-8"))
 
-            (fragments / "again.md").write_text(
+            (fragments / "3-again.md").write_text(
                 "## Fixed\n- A fix.\n",
                 encoding="utf-8",
             )
@@ -367,7 +367,7 @@ class ValidatorConformanceTests(unittest.TestCase):
                     version="v0.1.0",
                     date="2026-09-21",
                 )
-            self.assertTrue((fragments / "again.md").exists())
+            self.assertTrue((fragments / "3-again.md").exists())
 
     def test_valid_high_risk_route(self) -> None:
         self.assertEqual([], self.findings("valid-high.json"))
