@@ -71,12 +71,27 @@ func replayIntentRevocation(t *testing.T, bundle string) {
 	readReplayJSON(t, filepath.Join(bundle, "http", "recordings.json"), &recordings)
 	var heads []string
 	var posts []workflowCheckRun
+	authorized := event.Comment.AuthorAssociation == "OWNER"
+	sawPermission := false
 	link := regexp.MustCompile(fmt.Sprintf(`(?m)^(?:Fixes|Closes|Related)\s+#%d\s*$`, event.Issue.Number))
+	headPattern := regexp.MustCompile(`^[0-9a-f]{40}$`)
 	for _, item := range recordings {
-		switch item.Method {
-		case "GET":
-			if !strings.Contains(item.URL, "/pulls?") {
-				continue
+		switch {
+		case item.Method == "GET" && strings.Contains(item.URL, "/collaborators/"):
+			if event.Comment.AuthorAssociation == "OWNER" {
+				t.Fatal("owner authorization unexpectedly queried collaborator permission")
+			}
+			var permission struct {
+				Value string `json:"permission"`
+			}
+			if err := json.Unmarshal(item.Body, &permission); err != nil {
+				t.Fatalf("decode collaborator permission: %v", err)
+			}
+			sawPermission = true
+			authorized = permission.Value == "maintain" || permission.Value == "admin"
+		case item.Method == "GET" && strings.Contains(item.URL, "/pulls?"):
+			if !authorized {
+				t.Fatal("workflow continued after collaborator authorization failed")
 			}
 			var pulls []struct {
 				Body string `json:"body"`
@@ -89,15 +104,15 @@ func replayIntentRevocation(t *testing.T, bundle string) {
 			}
 			for _, pull := range pulls {
 				if link.MatchString(pull.Body) {
-					if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(pull.Head.SHA) {
+					if !headPattern.MatchString(pull.Head.SHA) {
 						t.Fatalf("linked pull head is not 40-hex: %q", pull.Head.SHA)
 					}
 					heads = append(heads, pull.Head.SHA)
 				}
 			}
-		case "POST":
-			if !strings.HasSuffix(item.URL, "/check-runs") {
-				continue
+		case item.Method == "POST" && strings.HasSuffix(item.URL, "/check-runs"):
+			if !authorized {
+				t.Fatal("workflow posted a revocation after authorization failed")
 			}
 			form := item.Request.Form
 			if form["status"] != "completed" || form["conclusion"] != "failure" ||
@@ -110,7 +125,12 @@ func replayIntentRevocation(t *testing.T, bundle string) {
 				Conclusion: form["conclusion"],
 				HeadSHA:    form["head_sha"],
 			})
+		default:
+			t.Fatalf("unused workflow recording: %s %s", item.Method, item.URL)
 		}
+	}
+	if event.Comment.AuthorAssociation != "OWNER" && !sawPermission {
+		t.Fatal("non-owner authorization did not query collaborator permission")
 	}
 
 	var expected struct {

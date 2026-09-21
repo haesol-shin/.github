@@ -1,7 +1,6 @@
 package changelog
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 	fragmentNamePattern   = regexp.MustCompile(`^(?:[1-9][0-9]*|direct)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$`)
 )
 
-var Sections = []string{"Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"}
+var sections = []string{"Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"}
 
 type Fragment struct {
 	Path     string
@@ -108,6 +108,9 @@ func ReadFragments(root string) ([]Fragment, error) {
 		if err != nil {
 			return nil, err
 		}
+		if !utf8.Valid(data) {
+			return nil, fmt.Errorf("%s: fragment is not valid UTF-8", name)
+		}
 		sections, err := ParseFragment(string(data), name)
 		if err != nil {
 			return nil, err
@@ -120,12 +123,12 @@ func ReadFragments(root string) ([]Fragment, error) {
 func RenderRelease(fragments []Fragment, version, date string) string {
 	grouped := make(map[string][]string)
 	for _, fragment := range fragments {
-		for _, section := range Sections {
+		for _, section := range sections {
 			grouped[section] = append(grouped[section], fragment.Sections[section]...)
 		}
 	}
 	lines := []string{fmt.Sprintf("## [%s] - %s", version, date), ""}
-	for _, section := range Sections {
+	for _, section := range sections {
 		bullets := grouped[section]
 		if len(bullets) == 0 {
 			continue
@@ -152,6 +155,9 @@ func Fold(root, changelogPath, version, date string) ([]string, error) {
 	existing, err := os.ReadFile(changelogPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
+	}
+	if !utf8.Valid(existing) {
+		return nil, fmt.Errorf("%s: changelog is not valid UTF-8", changelogPath)
 	}
 	if existingVersion(string(existing), version) {
 		return nil, fmt.Errorf("changelog already contains %s", version)
@@ -195,9 +201,8 @@ func allBlank(lines []string) bool {
 }
 
 func existingVersion(text, version string) bool {
-	scanner := bufio.NewScanner(strings.NewReader(strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")))
-	for scanner.Scan() {
-		match := versionHeadingPattern.FindStringSubmatch(scanner.Text())
+	for _, line := range normalizedLines(text) {
+		match := versionHeadingPattern.FindStringSubmatch(line)
 		if match != nil && match[1] == version {
 			return true
 		}

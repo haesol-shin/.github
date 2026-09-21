@@ -127,6 +127,7 @@ func TestGitMetadataResourceCapsFailClosed(t *testing.T) {
 			limits: gitLimits{
 				fetchedObjectBytes: 1,
 				tempDiskBytes:      generous,
+				diffInputBytes:     generous,
 				diffOutputBytes:    generous,
 			},
 			want: "git fetched-object bytes exceeded limit",
@@ -136,6 +137,7 @@ func TestGitMetadataResourceCapsFailClosed(t *testing.T) {
 			limits: gitLimits{
 				fetchedObjectBytes: generous,
 				tempDiskBytes:      1,
+				diffInputBytes:     generous,
 				diffOutputBytes:    generous,
 			},
 			want: "git temporary-directory bytes exceeded limit",
@@ -145,9 +147,20 @@ func TestGitMetadataResourceCapsFailClosed(t *testing.T) {
 			limits: gitLimits{
 				fetchedObjectBytes: generous,
 				tempDiskBytes:      generous,
+				diffInputBytes:     generous,
 				diffOutputBytes:    16,
 			},
 			want: "git diff output bytes exceeded limit",
+		},
+		{
+			name: "logical changed blobs",
+			limits: gitLimits{
+				fetchedObjectBytes: generous,
+				tempDiskBytes:      generous,
+				diffInputBytes:     1024 * 1024,
+				diffOutputBytes:    generous,
+			},
+			want: "git logical changed-blob bytes exceeded limit",
 		},
 	}
 	for _, tc := range cases {
@@ -169,7 +182,7 @@ func resourceCapRemote(t *testing.T) (map[string]any, string) {
 	git.run("add", ".")
 	git.run("commit", "-m", "base")
 	base := strings.TrimSpace(git.output("rev-parse", "HEAD"))
-	writeFile(t, filepath.Join(src, "payload.txt"), strings.Repeat("changed payload\n", 512))
+	writeFile(t, filepath.Join(src, "payload.txt"), strings.Repeat("changed payload\n", 512*1024))
 	git.run("add", ".")
 	git.run("commit", "-m", "head")
 	head := strings.TrimSpace(git.output("rev-parse", "HEAD"))

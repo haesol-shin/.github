@@ -12,17 +12,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
 // The byte caps are 16× the largest measured PR 13/14 preparation sample:
-// 409447 aggregate object bytes, 240422 temporary bytes, and 383732 diff bytes.
+// 409447 aggregate object bytes, 240422 temporary bytes, 435438 logical
+// changed-blob bytes, and 383732 diff-output bytes.
 const (
 	gitReadSize                 = 1024 * 1024
 	maxFetchedObjectBytes int64 = 6551152
 	maxTempDiskBytes      int64 = 3846752
+	maxDiffInputBytes     int64 = 6967008
 	maxDiffOutputBytes    int64 = 6139712
 	diskPollInterval            = 5 * time.Millisecond
 )
@@ -30,12 +33,14 @@ const (
 type gitLimits struct {
 	fetchedObjectBytes int64
 	tempDiskBytes      int64
+	diffInputBytes     int64
 	diffOutputBytes    int64
 }
 
 var productionGitLimits = gitLimits{
 	fetchedObjectBytes: maxFetchedObjectBytes,
 	tempDiskBytes:      maxTempDiskBytes,
+	diffInputBytes:     maxDiffInputBytes,
 	diffOutputBytes:    maxDiffOutputBytes,
 }
 
@@ -132,6 +137,9 @@ func gitMetadataWithLimits(ctx context.Context, pullRequest map[string]any, toke
 	if err := runGitLimited(ctx, directory, directory, env, limits.tempDiskBytes, "update-ref", "refs/repo-ops/base", mergeBase); err != nil {
 		return "", "", err
 	}
+	if err := checkDiffInputBytes(ctx, directory, env, limits); err != nil {
+		return "", "", err
+	}
 
 	digest, err := gitDiffDigest(ctx, directory, env, limits)
 	if err != nil {
@@ -202,6 +210,145 @@ func gitDiffDigest(ctx context.Context, directory string, env []string, limits g
 		return "", err
 	}
 	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), nil
+}
+
+func checkDiffInputBytes(ctx context.Context, directory string, env []string, limits gitLimits) error {
+	raw, err := gitBoundedOutput(
+		ctx,
+		directory,
+		env,
+		limits.tempDiskBytes,
+		maxDiffOutputBytes,
+		"",
+		"diff-tree",
+		"-r",
+		"--raw",
+		"--full-index",
+		"--no-commit-id",
+		"--no-renames",
+		"refs/repo-ops/base",
+		"refs/repo-ops/head",
+		"--",
+	)
+	if err != nil {
+		return fmt.Errorf("git diff-tree: %w", err)
+	}
+	objects := make(map[string]struct{})
+	zero := strings.Repeat("0", 40)
+	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
+		if line == "" {
+			continue
+		}
+		metadata := strings.Fields(strings.SplitN(line, "\t", 2)[0])
+		if len(metadata) < 5 || !strings.HasPrefix(metadata[0], ":") {
+			return fmt.Errorf("git diff-tree returned malformed metadata")
+		}
+		for _, object := range metadata[2:4] {
+			if object != zero {
+				objects[object] = struct{}{}
+			}
+		}
+	}
+	if len(objects) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(objects))
+	for object := range objects {
+		names = append(names, object)
+	}
+	sort.Strings(names)
+	input := strings.Join(names, "\n") + "\n"
+	checked, err := gitBoundedOutput(
+		ctx,
+		directory,
+		env,
+		limits.tempDiskBytes,
+		maxDiffOutputBytes,
+		input,
+		"cat-file",
+		"--batch-check=%(objectname) %(objecttype) %(objectsize)",
+	)
+	if err != nil {
+		return fmt.Errorf("git cat-file: %w", err)
+	}
+	total := int64(0)
+	for _, line := range strings.Split(strings.TrimSpace(checked), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			return fmt.Errorf("git cat-file returned malformed metadata")
+		}
+		if fields[1] != "blob" {
+			continue
+		}
+		size, err := strconv.ParseInt(fields[2], 10, 64)
+		if err != nil || size < 0 {
+			return fmt.Errorf("git cat-file returned invalid object size")
+		}
+		if size > limits.diffInputBytes-total {
+			return fmt.Errorf(
+				"git logical changed-blob bytes exceeded limit (%d + %d > %d)",
+				total,
+				size,
+				limits.diffInputBytes,
+			)
+		}
+		total += size
+	}
+	return nil
+}
+
+func gitBoundedOutput(
+	ctx context.Context,
+	directory string,
+	env []string,
+	diskLimit, outputLimit int64,
+	input string,
+	args ...string,
+) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = directory
+	cmd.Env = env
+	cmd.Stdin = strings.NewReader(input)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+	stopMonitor := monitorDirectory(cmd, directory, diskLimit)
+	var output bytes.Buffer
+	written, copyErr := io.CopyBuffer(
+		&output,
+		io.LimitReader(stdout, outputLimit+1),
+		make([]byte, 32*1024),
+	)
+	if copyErr != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		monitorErr := stopMonitor()
+		if monitorErr != nil {
+			return "", monitorErr
+		}
+		return "", copyErr
+	}
+	if written > outputLimit {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		_ = stopMonitor()
+		return "", fmt.Errorf("git metadata output bytes exceeded limit (%d > %d)", written, outputLimit)
+	}
+	if err := cmd.Wait(); err != nil {
+		monitorErr := stopMonitor()
+		if monitorErr != nil {
+			return "", monitorErr
+		}
+		return "", err
+	}
+	if err := stopMonitor(); err != nil {
+		return "", err
+	}
+	return output.String(), nil
 }
 
 func gitEnv(parent []string, token string) []string {

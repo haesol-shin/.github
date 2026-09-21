@@ -98,3 +98,76 @@ func TestFoldRejectsInvalidVersionAndDateBeforeMutation(t *testing.T) {
 		}
 	}
 }
+
+func TestFoldRejectsDuplicateAfterLongLine(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	fragments := filepath.Join(root, "changelog.d")
+	if err := os.Mkdir(fragments, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fragment := filepath.Join(fragments, "3-note.md")
+	if err := os.WriteFile(fragment, []byte("## Added\n- Entry.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changelogPath := filepath.Join(root, "CHANGELOG.md")
+	existing := strings.Repeat("x", 70*1024) + "\n## [v0.1.0] - 2026-09-20\n"
+	if err := os.WriteFile(changelogPath, []byte(existing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Fold(fragments, changelogPath, "v0.1.0", "2026-09-21")
+	if err == nil || !strings.Contains(err.Error(), "already contains v0.1.0") {
+		t.Fatalf("duplicate version error = %v", err)
+	}
+	if _, err := os.Stat(fragment); err != nil {
+		t.Fatalf("duplicate failure consumed fragment: %v", err)
+	}
+}
+
+func TestFoldRejectsInvalidUTF8BeforeMutation(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name              string
+		fragment          []byte
+		existingChangelog []byte
+		want              string
+	}{
+		{
+			name:     "fragment",
+			fragment: append([]byte("## Added\n- Entry "), 0xff, '\n'),
+			want:     "fragment is not valid UTF-8",
+		},
+		{
+			name:              "changelog",
+			fragment:          []byte("## Added\n- Entry.\n"),
+			existingChangelog: []byte{0xff, '\n'},
+			want:              "changelog is not valid UTF-8",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			fragments := filepath.Join(root, "changelog.d")
+			if err := os.Mkdir(fragments, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			fragment := filepath.Join(fragments, "3-note.md")
+			if err := os.WriteFile(fragment, tc.fragment, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			changelogPath := filepath.Join(root, "CHANGELOG.md")
+			if tc.existingChangelog != nil {
+				if err := os.WriteFile(changelogPath, tc.existingChangelog, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err := Fold(fragments, changelogPath, "v0.1.0", "2026-09-21")
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+			if _, err := os.Stat(fragment); err != nil {
+				t.Fatalf("UTF-8 failure consumed fragment: %v", err)
+			}
+		})
+	}
+}
