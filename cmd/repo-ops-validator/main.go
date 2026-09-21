@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/haesol-shin/.github/internal/collect"
 	"github.com/haesol-shin/.github/internal/evaluate"
 	"github.com/haesol-shin/.github/internal/fixture"
 )
@@ -15,24 +19,45 @@ import (
 const (
 	annotationPrefix         = "::warning title=Repository policy::"
 	mergeApprovalBlocked     = "contract check did not succeed; merge approval is blocked"
-	stage1EventUnsupported   = "live --event collection is not supported in stage 1; use --fixture"
 	exactlyOneSourceRequired = "exactly one of --fixture or --event is required"
 	contractMarker           = "contracts/v0.1.0/contract.json"
+	contractRootEnv          = "REPO_OPS_CONTRACT_ROOT"
+	liveCollectionTimeout    = 2 * time.Minute
 )
 
+// liveStateFunc loads evaluator state from a GitHub event path. Production uses
+// collect.BuildLiveState; tests inject a fake to avoid live GitHub and git.
+type liveStateFunc func(eventPath string, getenv func(string) string) (map[string]any, error)
+
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr, os.Getenv))
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr, os.Getenv, nil))
 }
 
-func run(args []string, stdout, stderr io.Writer, getenv func(string) string) int {
+func defaultLiveState(eventPath string, getenv func(string) string) (map[string]any, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), liveCollectionTimeout)
+	defer cancel()
+	return collect.BuildLiveState(
+		ctx,
+		eventPath,
+		getenv,
+		collect.NewGitHubClient(getenv("GITHUB_TOKEN"), getenv("GITHUB_API_URL"), nil),
+		collect.NewGitRunner(),
+	)
+}
+
+func run(args []string, stdout, stderr io.Writer, getenv func(string) string, live liveStateFunc) int {
+	if live == nil {
+		live = defaultLiveState
+	}
 	fs := flag.NewFlagSet("repo-ops-validator", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "usage: repo-ops-validator --fixture PATH | --event PATH [--check all|contract|merge-approval]\n")
+		fmt.Fprintf(stderr, "usage: repo-ops-validator --fixture PATH | --event PATH [--check all|contract|merge-approval] [--digest-out PATH]\n")
 	}
 	fixturePath := fs.String("fixture", "", "fixture state JSON")
-	eventPath := fs.String("event", "", "GitHub event JSON (unsupported in stage 1)")
+	eventPath := fs.String("event", "", "GitHub event JSON")
 	checkName := fs.String("check", "all", "all, contract, or merge-approval")
+	digestOut := fs.String("digest-out", "", "write collected plan and diff digests as JSON")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -55,20 +80,30 @@ func run(args []string, stdout, stderr io.Writer, getenv func(string) string) in
 		fmt.Fprintln(stderr, exactlyOneSourceRequired)
 		return 2
 	}
-	if hasEvent {
-		fmt.Fprintln(stderr, stage1EventUnsupported)
-		return 2
-	}
 
-	root, err := findRepoRoot(*fixturePath)
+	hint := *fixturePath
+	if hasEvent {
+		hint = *eventPath
+	}
+	root, err := findRepoRoot(hint, hasEvent, getenv)
 	if err != nil {
 		return emitFindings(stdout, getenv, []string{err.Error()}, *checkName)
 	}
 	contractRoot := filepath.Join(root, "contracts", "v0.1.0")
 
-	state, _, err := fixture.Load(*fixturePath)
+	var state map[string]any
+	if hasEvent {
+		state, err = live(*eventPath, getenv)
+	} else {
+		state, _, err = fixture.Load(*fixturePath)
+	}
 	if err != nil {
 		return emitFindings(stdout, getenv, []string{err.Error()}, *checkName)
+	}
+	if strings.TrimSpace(*digestOut) != "" {
+		if err := writeDigestEvidence(*digestOut, state); err != nil {
+			return emitFindings(stdout, getenv, []string{err.Error()}, *checkName)
+		}
 	}
 
 	var findings []string
@@ -98,6 +133,23 @@ func parseCheck(name string) (evaluate.Check, error) {
 	}
 }
 
+func writeDigestEvidence(path string, state map[string]any) error {
+	pullRequest, _ := state["pull_request"].(map[string]any)
+	evidence := map[string]any{
+		"plan_digest": state["plan_digest"],
+		"diff_digest": pullRequest["diff_digest"],
+	}
+	data, err := json.Marshal(evidence)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write digest evidence: %w", err)
+	}
+	return nil
+}
+
 func emitFindings(stdout io.Writer, getenv func(string) string, findings []string, check string) int {
 	if len(findings) == 0 {
 		fmt.Fprintf(stdout, "Repository policy / %s: contract satisfied\n", check)
@@ -120,16 +172,29 @@ func emitFindings(stdout io.Writer, getenv func(string) string, findings []strin
 	return 1
 }
 
-func findRepoRoot(hint string) (string, error) {
+func findRepoRoot(hint string, event bool, getenv func(string) string) (string, error) {
 	var starts []string
-	if wd, err := os.Getwd(); err == nil {
-		starts = append(starts, wd)
-	}
-	if hint != "" {
-		starts = append(starts, filepath.Dir(hint))
-	}
-	if exe, err := os.Executable(); err == nil {
-		starts = append(starts, filepath.Dir(exe))
+	if event {
+		if explicit := strings.TrimSpace(getenv(contractRootEnv)); explicit != "" {
+			root := filepath.Clean(explicit)
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(contractMarker))); err != nil {
+				return "", fmt.Errorf("%s does not contain %s", contractRootEnv, contractMarker)
+			}
+			return root, nil
+		}
+		if exe, err := os.Executable(); err == nil {
+			starts = append(starts, filepath.Dir(exe))
+		}
+	} else {
+		if wd, err := os.Getwd(); err == nil {
+			starts = append(starts, wd)
+		}
+		if hint != "" {
+			starts = append(starts, filepath.Dir(hint))
+		}
+		if exe, err := os.Executable(); err == nil {
+			starts = append(starts, filepath.Dir(exe))
+		}
 	}
 	seen := map[string]struct{}{}
 	for _, start := range starts {
@@ -149,5 +214,5 @@ func findRepoRoot(hint string) (string, error) {
 			dir = parent
 		}
 	}
-	return "", fmt.Errorf("repository root with %s not found", contractMarker)
+	return "", fmt.Errorf("trusted repository root with %s not found; set %s", contractMarker, contractRootEnv)
 }

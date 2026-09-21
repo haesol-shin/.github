@@ -1173,6 +1173,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--event", type=Path)
     parser.add_argument("--fixture", type=Path)
+    parser.add_argument("--digest-out", type=Path)
     parser.add_argument(
         "--check",
         choices=("all", "contract", "merge-approval"),
@@ -1189,6 +1190,15 @@ def main() -> int:
             state, _ = load_fixture(args.fixture)
         else:
             state = build_live_state(args.event)
+        if args.digest_out:
+            digest_evidence = {
+                "plan_digest": state.get("plan_digest", "none"),
+                "diff_digest": state.get("pull_request", {}).get("diff_digest"),
+            }
+            args.digest_out.write_text(
+                json.dumps(digest_evidence, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
         if args.check == "merge-approval":
             contract_findings = validate_state(state, contract_root, check="contract")
             findings = validate_state(state, contract_root, check="merge-approval")

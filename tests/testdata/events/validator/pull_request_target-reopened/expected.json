@@ -1,0 +1,23 @@
+{
+  "all": {
+    "exit": 0,
+    "findings": [],
+    "check_conclusion": "success",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:247981a39f8c3ddd7b773ca637986bf9bfc7cec657b62c46c2a853a6581e8a56"
+  },
+  "contract": {
+    "exit": 0,
+    "findings": [],
+    "check_conclusion": "success",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:247981a39f8c3ddd7b773ca637986bf9bfc7cec657b62c46c2a853a6581e8a56"
+  },
+  "merge-approval": {
+    "exit": 0,
+    "findings": [],
+    "check_conclusion": "success",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:247981a39f8c3ddd7b773ca637986bf9bfc7cec657b62c46c2a853a6581e8a56"
+  }
+}

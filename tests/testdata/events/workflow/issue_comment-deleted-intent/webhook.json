@@ -1,0 +1,45 @@
+{
+  "action": "deleted",
+  "issue": {
+    "number": 3,
+    "title": "Publish repo-ops v0.1.0",
+    "body": "## Problem\n\nNeed a trusted contract.\n",
+    "html_url": "https://github.com/haesol-shin/.github/issues/3",
+    "user": {
+      "login": "haesol-shin",
+      "id": 23266,
+      "type": "User"
+    },
+    "state": "open",
+    "pull_request": null
+  },
+  "comment": {
+    "id": 303,
+    "body": "Intent accepted.\n\nRemoving this intent comment revokes linked open pull checks.\n",
+    "user": {
+      "login": "helper",
+      "id": 95088,
+      "type": "User"
+    },
+    "author_association": "COLLABORATOR",
+    "html_url": "https://github.com/haesol-shin/.github/issues/3#issuecomment-303"
+  },
+  "repository": {
+    "id": 1,
+    "name": ".github",
+    "full_name": "haesol-shin/.github",
+    "private": false,
+    "owner": {
+      "login": "haesol-shin",
+      "id": 23266,
+      "type": "User"
+    },
+    "html_url": "https://github.com/haesol-shin/.github",
+    "clone_url": "https://github.com/haesol-shin/.github.git"
+  },
+  "sender": {
+    "login": "helper",
+    "id": 95088,
+    "type": "User"
+  }
+}

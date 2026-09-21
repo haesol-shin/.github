@@ -1,0 +1,29 @@
+{
+  "all": {
+    "exit": 1,
+    "findings": [
+      "merge-review head does not match the current pull request",
+      "merge-review diff does not match the current pull request"
+    ],
+    "check_conclusion": "failure",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:e0f94be456a437d02fb06978c1b0189ae041a0c28b738732697dcc80337fff09"
+  },
+  "contract": {
+    "exit": 0,
+    "findings": [],
+    "check_conclusion": "success",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:e0f94be456a437d02fb06978c1b0189ae041a0c28b738732697dcc80337fff09"
+  },
+  "merge-approval": {
+    "exit": 1,
+    "findings": [
+      "merge-review head does not match the current pull request",
+      "merge-review diff does not match the current pull request"
+    ],
+    "check_conclusion": "failure",
+    "plan_digest": "sha256:05d8bc6233febe161f72fb8d87fe8614a339774e0698a4750309431dcbf9432c",
+    "diff_digest": "sha256:e0f94be456a437d02fb06978c1b0189ae041a0c28b738732697dcc80337fff09"
+  }
+}
