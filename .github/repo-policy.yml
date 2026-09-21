@@ -3,7 +3,7 @@ profile: operations
 quality:
   check: quality
   commands:
-    - python -m unittest discover -s tests -v
+    - go test ./...
 review:
   shared_identity: true
 changelog:

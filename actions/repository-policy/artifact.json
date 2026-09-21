@@ -1,0 +1,13 @@
+{
+  "source_commit": "101f601f6022954d8b4e466d8280dc064f94e393",
+  "toolchain": "go version go1.22.12 linux/arm64",
+  "goos": "linux",
+  "goarch": "amd64",
+  "cgo_enabled": "0",
+  "go_mod_sha256": "sha256:cb6d461caee89b4c10c4c289251414bf0f52d8cee3238cdbd12cbda64b01952d",
+  "go_sum_sha256": "sha256:e42794fa9b56301ad073de55cac1dea683b320ed951454d8709ffc7156088dd2",
+  "recipe": "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o repo-ops-validator ./cmd/repo-ops-validator",
+  "sha256": "sha256:1fc619b35ac8c1643fe63c88dd7d51288a312d9f2d5a29a41184628a6fd73658",
+  "size": 8633358,
+  "uri": "https://github.com/haesol-shin/.github/releases/download/repo-ops-validator-101f601f6022954d8b4e466d8280dc064f94e393-immutable/repo-ops-validator-linux-amd64-sha256-1fc619b35ac8c1643fe63c88dd7d51288a312d9f2d5a29a41184628a6fd73658"
+}
