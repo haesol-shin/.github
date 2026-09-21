@@ -1,0 +1,55 @@
+# Isolated pre-cutover evidence only. Never merge this workflow.
+name: Python production policy baseline
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  python-policy-baseline:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    name: python-policy-baseline-${{ matrix.sample }}
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      issues: read
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [1, 2, 3, 4, 5]
+    steps:
+      - name: Check out measurement harness
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check out exact Python production tree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: 101f601f6022954d8b4e466d8280dc064f94e393
+          path: .repo-ops
+      - name: Measure cold contract invocation
+        uses: ./actions/repository-policy-baseline
+        with:
+          github-token: ${{ github.token }}
+          check: contract
+          sample: ${{ matrix.sample }}
+          phase: cold
+      - name: Measure warm merge-approval invocation
+        uses: ./actions/repository-policy-baseline
+        with:
+          github-token: ${{ github.token }}
+          check: merge-approval
+          sample: ${{ matrix.sample }}
+          phase: warm
+      - name: Upload Python policy baseline sample
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: python-policy-baseline-${{ matrix.sample }}
+          path: ${{ runner.temp }}/python-policy-baseline/sample-*.json
+          if-no-files-found: error

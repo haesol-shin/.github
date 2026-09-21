@@ -1,0 +1,128 @@
+name: Repository policy baseline measurement
+description: Measure one production composite-action invocation without changing its implementation
+inputs:
+  github-token:
+    required: true
+  check:
+    required: true
+  sample:
+    required: true
+  phase:
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Start wall-time and RSS measurement
+      shell: bash
+      env:
+        SAMPLE: ${{ inputs.sample }}
+        PHASE: ${{ inputs.phase }}
+      run: |
+        set -euo pipefail
+        record_dir="${RUNNER_TEMP}/python-policy-baseline"
+        mkdir -p "$record_dir"
+        prefix="${record_dir}/sample-${SAMPLE}-${PHASE}"
+        date +%s%N > "${prefix}.start-ns"
+        python3 - "$prefix" >"${prefix}.monitor.log" 2>&1 <<'PY' &
+        import os
+        import sys
+        import time
+        from pathlib import Path
+
+        prefix = Path(sys.argv[1])
+        stop = Path(str(prefix) + ".stop")
+        peak = 0
+        observed = False
+
+        def processes():
+            result = {}
+            for entry in Path("/proc").iterdir():
+                if not entry.name.isdigit():
+                    continue
+                try:
+                    status = (entry / "status").read_text(encoding="utf-8")
+                    cmdline = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+                except (FileNotFoundError, PermissionError, ProcessLookupError):
+                    continue
+                parent = 0
+                rss = 0
+                for line in status.splitlines():
+                    if line.startswith("PPid:"):
+                        parent = int(line.split()[1])
+                    elif line.startswith("VmRSS:"):
+                        rss = int(line.split()[1])
+                result[int(entry.name)] = (parent, rss, cmdline)
+            return result
+
+        while not stop.exists():
+            table = processes()
+            roots = {
+                pid for pid, (_, _, cmdline) in table.items()
+                if "actions/repository-policy/validate.py" in cmdline
+            }
+            if roots:
+                observed = True
+                descendants = set(roots)
+                changed = True
+                while changed:
+                    changed = False
+                    for pid, (parent, _, _) in table.items():
+                        if parent in descendants and pid not in descendants:
+                            descendants.add(pid)
+                            changed = True
+                peak = max(peak, sum(table[pid][1] for pid in descendants if pid in table))
+            time.sleep(0.001)
+        Path(str(prefix) + ".rss-kib").write_text(f"{peak}\n", encoding="utf-8")
+        Path(str(prefix) + ".observed").write_text(f"{str(observed).lower()}\n", encoding="utf-8")
+        PY
+        printf '%s\n' "$!" > "${prefix}.monitor-pid"
+    - id: validator
+      name: Invoke production repository-policy action
+      continue-on-error: true
+      uses: ./.repo-ops/actions/repository-policy
+      with:
+        github-token: ${{ inputs.github-token }}
+        check: ${{ inputs.check }}
+    - name: Finish measurement
+      if: always()
+      shell: bash
+      env:
+        SAMPLE: ${{ inputs.sample }}
+        PHASE: ${{ inputs.phase }}
+        CHECK: ${{ inputs.check }}
+        ACTION_OUTCOME: ${{ steps.validator.outcome }}
+      run: |
+        set -euo pipefail
+        record_dir="${RUNNER_TEMP}/python-policy-baseline"
+        prefix="${record_dir}/sample-${SAMPLE}-${PHASE}"
+        end_ns="$(date +%s%N)"
+        touch "${prefix}.stop"
+        wait "$(cat "${prefix}.monitor-pid")"
+        start_ns="$(cat "${prefix}.start-ns")"
+        peak_rss_kib="$(cat "${prefix}.rss-kib")"
+        observed="$(cat "${prefix}.observed")"
+        START_NS="$start_ns" END_NS="$end_ns" PEAK_RSS_KIB="$peak_rss_kib" OBSERVED="$observed" \
+          python3 - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+
+        record = {
+            "sample": int(os.environ["SAMPLE"]),
+            "phase": os.environ["PHASE"],
+            "check": os.environ["CHECK"],
+            "action_outcome": os.environ["ACTION_OUTCOME"],
+            "wall_ms": (int(os.environ["END_NS"]) - int(os.environ["START_NS"])) // 1_000_000,
+            "peak_rss_kib": int(os.environ["PEAK_RSS_KIB"]),
+            "validator_process_observed": os.environ["OBSERVED"] == "true",
+            "rss_method": "1ms /proc scan; sum VmRSS for validate.py roots and descendants",
+            "runner_os": os.environ["RUNNER_OS"],
+            "run_id": os.environ["GITHUB_RUN_ID"],
+            "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+            "source_commit": "101f601f6022954d8b4e466d8280dc064f94e393",
+            "cache_state": "production setup-uv cache enabled; cold is first action invocation in this job; warm reuses same-job uv environment/cache",
+        }
+        path = Path(os.environ["RUNNER_TEMP"]) / "python-policy-baseline" / f"sample-{record['sample']}-{record['phase']}.json"
+        path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        PY
+        [[ "$observed" == "true" ]]
