@@ -212,3 +212,62 @@ func TestFoldRejectsInvalidUTF8BeforeMutation(t *testing.T) {
 		})
 	}
 }
+
+func TestFoldConsumesLegacyFilename(t *testing.T) {
+	root := t.TempDir()
+	fragments := filepath.Join(root, "changelog.d")
+	if err := os.Mkdir(fragments, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := filepath.Join(fragments, "3-repo-ops-v0.1.0.md")
+	valid := filepath.Join(fragments, "3-a-first.md")
+	if err := os.WriteFile(legacy, []byte("## Added\n- Legacy entry.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(valid, []byte("## Fixed\n- Valid entry.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changelogPath := filepath.Join(root, "CHANGELOG.md")
+	consumed, err := Fold(fragments, changelogPath, "v0.1.0", "2026-09-21")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantConsumed := []string{valid, legacy}
+	if !reflect.DeepEqual(consumed, wantConsumed) {
+		t.Fatalf("consumed = %v, want %v", consumed, wantConsumed)
+	}
+	data, err := os.ReadFile(changelogPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "## [v0.1.0] - 2026-09-21\n\n### Added\n- Legacy entry.\n\n### Fixed\n- Valid entry.\n"
+	if string(data) != want {
+		t.Fatalf("changelog = %q, want %q", data, want)
+	}
+	for _, path := range wantConsumed {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("consumed fragment still exists: %s, %v", path, err)
+		}
+	}
+}
+
+func TestFoldRejectsMalformedLegacyFilenameBeforeMutation(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	fragments := filepath.Join(root, "changelog.d")
+	if err := os.Mkdir(fragments, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := filepath.Join(fragments, "3-repo-ops-v0.1.0.md")
+	if err := os.WriteFile(legacy, []byte("## Notes\n- Unsupported section.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changelogPath := filepath.Join(root, "CHANGELOG.md")
+	_, err := Fold(fragments, changelogPath, "v0.1.0", "2026-09-21")
+	if err == nil || !strings.Contains(err.Error(), "content must follow an allowed section heading") {
+		t.Fatalf("error = %v", err)
+	}
+	if _, err := os.Stat(legacy); err != nil {
+		t.Fatalf("malformed legacy fragment was consumed: %v", err)
+	}
+}

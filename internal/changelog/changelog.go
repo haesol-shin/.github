@@ -18,7 +18,6 @@ var (
 	sectionPattern        = regexp.MustCompile(`^## (Added|Changed|Deprecated|Removed|Fixed|Security)$`)
 	versionPattern        = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
 	versionHeadingPattern = regexp.MustCompile(`^## \[?(v[0-9]+\.[0-9]+\.[0-9]+)\]?(?: - .*)?$`)
-	fragmentNamePattern   = regexp.MustCompile(`^(?:[1-9][0-9]*|direct)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$`)
 )
 
 var sections = []string{"Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"}
@@ -100,9 +99,6 @@ func ReadFragments(root string) ([]Fragment, error) {
 
 	fragments := make([]Fragment, 0, len(names))
 	for _, name := range names {
-		if !fragmentNamePattern.MatchString(name) {
-			return nil, fmt.Errorf("%s: invalid fragment filename", name)
-		}
 		path := filepath.Join(root, name)
 		data, err := os.ReadFile(path)
 		if err != nil {

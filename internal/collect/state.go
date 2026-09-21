@@ -107,13 +107,17 @@ func BuildLiveState(ctx context.Context, eventPath string, getenv func(string) s
 		if !ok {
 			continue
 		}
-		files = append(files, map[string]any{
+		entry := map[string]any{
 			"filename":  filename,
 			"status":    obj["status"],
 			"additions": obj["additions"],
 			"deletions": obj["deletions"],
 			"changes":   obj["changes"],
-		})
+		}
+		if previous, ok := obj["previous_filename"].(string); ok && previous != "" {
+			entry["previous_filename"] = previous
+		}
+		files = append(files, entry)
 	}
 
 	fragmentRoot := "changelog.d"
@@ -132,16 +136,12 @@ func BuildLiveState(ctx context.Context, eventPath string, getenv func(string) s
 	fragmentContents := map[string]any{}
 	for _, entryAny := range files {
 		entry := asMap(entryAny)
-		status := strings.ToLower(fmt.Sprint(entry["status"]))
-		if entry["status"] == nil {
-			status = ""
-		} else if s, ok := entry["status"].(string); ok {
+		status := ""
+		if s, ok := entry["status"].(string); ok {
 			status = strings.ToLower(s)
-		} else {
-			status = strings.ToLower(fmt.Sprint(entry["status"]))
 		}
 		filename, _ := entry["filename"].(string)
-		if (status == "added" || status == "modified") && fragmentPath(filename, fragmentRoot) {
+		if status != "" && status != "removed" && fragmentPath(filename, fragmentRoot) {
 			content, err := APIContent(ctx, gh, repository, filename, headSHA)
 			if err != nil {
 				return nil, err

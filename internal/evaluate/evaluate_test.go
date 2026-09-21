@@ -105,7 +105,7 @@ const (
 )
 
 var changelogLifecycleFindings = []string{
-	"required changelog declarations need an added or modified fragment",
+	"required changelog declarations need an added, modified, renamed, or copied fragment",
 	"ordinary pull requests must not edit CHANGELOG.md",
 	"fragment deletion is reserved for release changelog declarations",
 	"release changelog declarations must update CHANGELOG.md",
@@ -285,6 +285,152 @@ func TestFragmentSectionFinding(t *testing.T) {
 	if !containsFinding(got, "content must follow an allowed section heading") {
 		t.Fatalf("expected fragment section finding, got %v", got)
 	}
+}
+
+func TestReleaseAcceptsTrustedBaseFragmentDeletion(t *testing.T) {
+	for _, filename := range []string{
+		"changelog.d/42-validator.md",
+		"changelog.d/3-repo-ops-v0.1.0.md",
+	} {
+		t.Run(filename, func(t *testing.T) {
+			files := []any{
+				map[string]any{"filename": "CHANGELOG.md", "status": "added"},
+				map[string]any{"filename": filename, "status": "removed"},
+			}
+			state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, nil, "")
+			got := findings(t, state, CheckContract)
+			if len(got) != 0 {
+				t.Fatalf("release deletion of %s: %v", filename, got)
+			}
+		})
+	}
+}
+
+func TestRejectsInvalidIncomingFragmentFilename(t *testing.T) {
+	for _, status := range []string{"added", "modified", "renamed", "copied"} {
+		t.Run(status, func(t *testing.T) {
+			files := []any{
+				map[string]any{"filename": "changelog.d/3-repo-ops-v0.1.0.md", "status": status},
+			}
+			contents := map[string]any{
+				"changelog.d/3-repo-ops-v0.1.0.md": "## Fixed\n- Consume a legacy trusted-base fragment.\n",
+			}
+			state := withChangelogLine(t, "repo-ops.changelog.v1 kind:required value:fragment-added", files, contents, "")
+			got := findings(t, state, CheckContract)
+			if !containsFinding(got, "fragment filename must use <issue>-<slug>.md or direct-<slug>.md") {
+				t.Fatalf("expected incoming filename rejection, got %v", got)
+			}
+		})
+	}
+}
+
+func TestReleaseRenameCannotBypassIncomingFilenameValidation(t *testing.T) {
+	for _, status := range []string{"renamed", "copied"} {
+		t.Run(status, func(t *testing.T) {
+			files := []any{
+				map[string]any{"filename": "CHANGELOG.md", "status": "added"},
+				map[string]any{"filename": "changelog.d/5-go-validator.md", "status": "removed"},
+				map[string]any{
+					"filename":          "changelog.d/3-repo-ops-v0.1.0.md",
+					"status":            status,
+					"previous_filename": "changelog.d/11-changelog-machine-record.md",
+				},
+			}
+			contents := map[string]any{
+				"changelog.d/3-repo-ops-v0.1.0.md": "## Fixed\n- Consume a legacy trusted-base fragment.\n",
+			}
+			state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, contents, "")
+			got := findings(t, state, CheckContract)
+			if !containsFinding(got, "release changelog declarations must consume, not modify, fragments") {
+				t.Fatalf("expected consume-not-modify rejection, got %v", got)
+			}
+			if !containsFinding(got, "fragment filename must use <issue>-<slug>.md or direct-<slug>.md") {
+				t.Fatalf("expected incoming filename rejection, got %v", got)
+			}
+		})
+	}
+}
+
+func TestReleaseCopyOutCannotSatisfyFragmentConsumption(t *testing.T) {
+	files := []any{
+		map[string]any{"filename": "CHANGELOG.md", "status": "added"},
+		map[string]any{
+			"filename":          "docs/copied-note.md",
+			"status":            "copied",
+			"previous_filename": "changelog.d/42-validator.md",
+		},
+	}
+	state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, nil, "")
+	got := findings(t, state, CheckContract)
+	if !containsFinding(got, "release changelog declarations must consume at least one fragment") {
+		t.Fatalf("copy out of changelog.d must not count as consumption, got %v", got)
+	}
+}
+
+func TestRequiredDeclarationAcceptsCopiedOwnedFragment(t *testing.T) {
+	files := []any{
+		map[string]any{
+			"filename":          "changelog.d/42-validator.md",
+			"status":            "copied",
+			"previous_filename": "changelog.d/42-source.md",
+		},
+	}
+	contents := map[string]any{
+		"changelog.d/42-validator.md": "## Changed\n- Validate the trusted policy contract.\n",
+	}
+	state := withChangelogLine(t, "repo-ops.changelog.v1 kind:required value:fragment-added", files, contents, "")
+	got := findings(t, state, CheckContract)
+	if len(got) != 0 {
+		t.Fatalf("owned copied fragment should pass, got %v", got)
+	}
+}
+
+func TestOrdinaryPRRejectsRenamedChangelogPrevious(t *testing.T) {
+	files := []any{
+		map[string]any{
+			"filename":          "docs/history.md",
+			"status":            "renamed",
+			"previous_filename": "CHANGELOG.md",
+		},
+	}
+	state := withChangelogLine(t, fixtureChangelog, files, nil, "")
+	got := findings(t, state, CheckContract)
+	if !containsFinding(got, "ordinary pull requests must not edit CHANGELOG.md") {
+		t.Fatalf("expected CHANGELOG rename rejection, got %v", got)
+	}
+}
+
+func TestUnsupportedStatusCannotSatisfyRequiredOrRelease(t *testing.T) {
+	t.Run("required", func(t *testing.T) {
+		files := []any{
+			map[string]any{"filename": "changelog.d/42-validator.md", "status": "unchanged"},
+		}
+		contents := map[string]any{
+			"changelog.d/42-validator.md": "## Changed\n- Validate the trusted policy contract.\n",
+		}
+		state := withChangelogLine(t, "repo-ops.changelog.v1 kind:required value:fragment-added", files, contents, "")
+		got := findings(t, state, CheckContract)
+		if !containsFinding(got, "changelog file status must be added, modified, renamed, copied, or removed") {
+			t.Fatalf("expected unsupported status finding, got %v", got)
+		}
+		if !containsFinding(got, "required changelog declarations need an added, modified, renamed, or copied fragment") {
+			t.Fatalf("unchanged must not satisfy required, got %v", got)
+		}
+	})
+	t.Run("release", func(t *testing.T) {
+		files := []any{
+			map[string]any{"filename": "CHANGELOG.md", "status": "unchanged"},
+			map[string]any{"filename": "changelog.d/42-validator.md", "status": "removed"},
+		}
+		state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, nil, "")
+		got := findings(t, state, CheckContract)
+		if !containsFinding(got, "changelog file status must be added, modified, renamed, copied, or removed") {
+			t.Fatalf("expected unsupported status finding, got %v", got)
+		}
+		if !containsFinding(got, "release changelog declarations must update CHANGELOG.md") {
+			t.Fatalf("unchanged must not satisfy release, got %v", got)
+		}
+	})
 }
 
 func TestChangelogRecordAcceptsIndentation(t *testing.T) {

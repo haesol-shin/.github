@@ -29,7 +29,7 @@
       },
       "expected": {
         "valid": false,
-        "findings": ["required changelog declarations need an added or modified fragment"]
+        "findings": ["required changelog declarations need an added, modified, renamed, or copied fragment"]
       }
     },
     {
