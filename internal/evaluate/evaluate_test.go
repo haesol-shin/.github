@@ -351,6 +351,40 @@ func TestReleaseRenameCannotBypassIncomingFilenameValidation(t *testing.T) {
 	}
 }
 
+func TestReleaseCopyOutCannotSatisfyFragmentConsumption(t *testing.T) {
+	files := []any{
+		map[string]any{"filename": "CHANGELOG.md", "status": "added"},
+		map[string]any{
+			"filename":          "docs/copied-note.md",
+			"status":            "copied",
+			"previous_filename": "changelog.d/42-validator.md",
+		},
+	}
+	state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, nil, "")
+	got := findings(t, state, CheckContract)
+	if !containsFinding(got, "release changelog declarations must consume at least one fragment") {
+		t.Fatalf("copy out of changelog.d must not count as consumption, got %v", got)
+	}
+}
+
+func TestRequiredDeclarationAcceptsCopiedOwnedFragment(t *testing.T) {
+	files := []any{
+		map[string]any{
+			"filename":          "changelog.d/42-validator.md",
+			"status":            "copied",
+			"previous_filename": "changelog.d/42-source.md",
+		},
+	}
+	contents := map[string]any{
+		"changelog.d/42-validator.md": "## Changed\n- Validate the trusted policy contract.\n",
+	}
+	state := withChangelogLine(t, "repo-ops.changelog.v1 kind:required value:fragment-added", files, contents, "")
+	got := findings(t, state, CheckContract)
+	if len(got) != 0 {
+		t.Fatalf("owned copied fragment should pass, got %v", got)
+	}
+}
+
 func TestChangelogRecordAcceptsIndentation(t *testing.T) {
 	state := withChangelogLine(t, "    "+fixtureChangelog, nil, nil, "")
 	if got := findings(t, state, CheckContract); len(got) != 0 {

@@ -135,11 +135,13 @@ func validateChangelogState(state map[string]any, policy map[string]any, issue a
 				deletedFragments = append(deletedFragments, entry)
 			}
 		}
-		if previous := asString(entry["previous_filename"]); previous != "" && fragmentPath(previous, root) {
-			deletedFragments = append(deletedFragments, map[string]any{
-				"filename": previous,
-				"status":   "removed",
-			})
+		if status == "renamed" {
+			if previous := asString(entry["previous_filename"]); previous != "" && fragmentPath(previous, root) {
+				deletedFragments = append(deletedFragments, map[string]any{
+					"filename": previous,
+					"status":   "removed",
+				})
+			}
 		}
 		if normalizeSlash(filename) == "CHANGELOG.md" {
 			directChangelog = append(directChangelog, entry)
