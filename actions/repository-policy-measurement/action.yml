@@ -1,0 +1,169 @@
+name: Repository policy production measurement
+description: Measure one production composite-action invocation without changing its implementation
+inputs:
+  github-token:
+    required: true
+  check:
+    required: true
+  sample:
+    required: true
+  phase:
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Start wall-time and RSS measurement
+      shell: bash
+      env:
+        SAMPLE: ${{ inputs.sample }}
+        PHASE: ${{ inputs.phase }}
+      run: |
+        set -euo pipefail
+        record_dir="${RUNNER_TEMP}/go-policy-measurement"
+        mkdir -p "$record_dir"
+        prefix="${record_dir}/sample-${SAMPLE}-${PHASE}"
+        date +%s%N > "${prefix}.start-ns"
+        python3 - "$prefix" >"${prefix}.monitor.log" 2>&1 <<'PY' &
+        import json
+        import sys
+        import time
+        from pathlib import Path
+
+        prefix = Path(sys.argv[1])
+        stop = Path(str(prefix) + ".stop")
+        peak = 0
+        observed = False
+        peak_processes = []
+
+        def processes():
+            result = {}
+            for entry in Path("/proc").iterdir():
+                if not entry.name.isdigit():
+                    continue
+                try:
+                    status = (entry / "status").read_text(encoding="utf-8")
+                    cmdline = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+                except (FileNotFoundError, PermissionError, ProcessLookupError):
+                    continue
+                parent = 0
+                rss = 0
+                for line in status.splitlines():
+                    if line.startswith("PPid:"):
+                        parent = int(line.split()[1])
+                    elif line.startswith("VmRSS:"):
+                        rss = int(line.split()[1])
+                result[int(entry.name)] = (parent, rss, cmdline)
+            return result
+
+        markers = (
+            ".repo-ops/actions/repository-policy/run.sh",
+            ".repo-ops/actions/repository-policy/download.mjs",
+            "/repo-ops-validator.",
+        )
+        while not stop.exists():
+            table = processes()
+            roots = {
+                pid for pid, (_, _, cmdline) in table.items()
+                if any(marker in cmdline for marker in markers)
+            }
+            if roots:
+                observed = True
+                descendants = set(roots)
+                changed = True
+                while changed:
+                    changed = False
+                    for pid, (parent, _, _) in table.items():
+                        if parent in descendants and pid not in descendants:
+                            descendants.add(pid)
+                            changed = True
+                total = sum(table[pid][1] for pid in descendants if pid in table)
+                if total > peak:
+                    peak = total
+                    peak_processes = [
+                        {
+                            "pid": pid,
+                            "ppid": table[pid][0],
+                            "rss_kib": table[pid][1],
+                            "cmdline": table[pid][2],
+                        }
+                        for pid in sorted(descendants)
+                        if pid in table
+                    ]
+            time.sleep(0.001)
+        Path(str(prefix) + ".rss-kib").write_text(f"{peak}\n", encoding="utf-8")
+        Path(str(prefix) + ".observed").write_text(f"{str(observed).lower()}\n", encoding="utf-8")
+        Path(str(prefix) + ".peak-processes.json").write_text(
+            json.dumps(peak_processes, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        PY
+        printf '%s\n' "$!" > "${prefix}.monitor-pid"
+    - id: validator
+      name: Invoke production repository-policy action
+      continue-on-error: true
+      uses: ./.repo-ops/actions/repository-policy
+      with:
+        github-token: ${{ inputs.github-token }}
+        check: ${{ inputs.check }}
+    - name: Finish measurement
+      if: always()
+      shell: bash
+      env:
+        SAMPLE: ${{ inputs.sample }}
+        PHASE: ${{ inputs.phase }}
+        CHECK: ${{ inputs.check }}
+        ACTION_OUTCOME: ${{ steps.validator.outcome }}
+      run: |
+        set -euo pipefail
+        record_dir="${RUNNER_TEMP}/go-policy-measurement"
+        prefix="${record_dir}/sample-${SAMPLE}-${PHASE}"
+        end_ns="$(date +%s%N)"
+        touch "${prefix}.stop"
+        monitor_pid="$(cat "${prefix}.monitor-pid")"
+        for _ in {1..1000}; do
+          if ! kill -0 "$monitor_pid" 2>/dev/null; then
+            break
+          fi
+          sleep 0.01
+        done
+        if kill -0 "$monitor_pid" 2>/dev/null; then
+          kill "$monitor_pid" 2>/dev/null || true
+          echo "RSS monitor did not stop" >&2
+          exit 1
+        fi
+        start_ns="$(cat "${prefix}.start-ns")"
+        peak_rss_kib="$(cat "${prefix}.rss-kib")"
+        observed="$(cat "${prefix}.observed")"
+        START_NS="$start_ns" END_NS="$end_ns" PEAK_RSS_KIB="$peak_rss_kib" OBSERVED="$observed" \
+          python3 - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+
+        start_ns = int(os.environ["START_NS"])
+        end_ns = int(os.environ["END_NS"])
+        prefix = Path(os.environ["RUNNER_TEMP"]) / "go-policy-measurement" / f"sample-{os.environ['SAMPLE']}-{os.environ['PHASE']}"
+        record = {
+            "sample": int(os.environ["SAMPLE"]),
+            "phase": os.environ["PHASE"],
+            "check": os.environ["CHECK"],
+            "action_outcome": os.environ["ACTION_OUTCOME"],
+            "start_ns": start_ns,
+            "end_ns": end_ns,
+            "wall_ms": (end_ns - start_ns) // 1_000_000,
+            "peak_rss_kib": int(os.environ["PEAK_RSS_KIB"]),
+            "peak_processes": json.loads(Path(str(prefix) + ".peak-processes.json").read_text(encoding="utf-8")),
+            "validator_process_observed": os.environ["OBSERVED"] == "true",
+            "rss_method": "1ms /proc scan; sum VmRSS for run.sh, download.mjs, repo-ops-validator roots and descendants",
+            "runner_os": os.environ["RUNNER_OS"],
+            "run_id": os.environ["GITHUB_RUN_ID"],
+            "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+            "source_commit": "6f310d48eccc86493ee89961a31f9fae1a178024",
+            "artifact_sha256": "sha256:1fc619b35ac8c1643fe63c88dd7d51288a312d9f2d5a29a41184628a6fd73658",
+            "artifact_size": 8633358,
+            "phase_note": "first/second describe production invocation order and check type; each invocation performs its own bounded artifact download and verification",
+        }
+        path = Path(os.environ["RUNNER_TEMP"]) / "go-policy-measurement" / f"sample-{record['sample']}-{record['phase']}.json"
+        path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        PY
+        [[ "$observed" == "true" ]]
