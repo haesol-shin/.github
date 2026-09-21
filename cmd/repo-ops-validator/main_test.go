@@ -2,9 +2,12 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -195,6 +198,81 @@ func TestEventRootRequiresTrustedLocation(t *testing.T) {
 	}
 	if root != testRepoRoot() {
 		t.Fatalf("root = %q, want %q", root, testRepoRoot())
+	}
+}
+
+func TestFixtureMatrixMatchesCommittedOracle(t *testing.T) {
+	type row struct {
+		Fixture         string   `json:"fixture"`
+		Check           string   `json:"check"`
+		Exit            int      `json:"exit"`
+		Findings        []string `json:"findings"`
+		CheckConclusion string   `json:"check_conclusion"`
+	}
+	var matrix struct {
+		Cases []row `json:"cases"`
+	}
+	data, err := os.ReadFile(filepath.Join(testRepoRoot(), "tests", "testdata", "go-oracle", "matrix.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatal(err)
+	}
+	if len(matrix.Cases) == 0 {
+		t.Fatal("fixture matrix is empty")
+	}
+	fixtures, err := os.ReadDir(filepath.Join(testRepoRoot(), "fixtures"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedKeys := make(map[string]struct{})
+	for _, entry := range fixtures {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" ||
+			entry.Name() == "changelog-conformance.json" ||
+			entry.Name() == "intent-comment-revocation.json" {
+			continue
+		}
+		for _, check := range []string{"all", "contract", "merge-approval"} {
+			expectedKeys[entry.Name()+"/"+check] = struct{}{}
+		}
+	}
+	actualKeys := make(map[string]struct{}, len(matrix.Cases))
+	for _, tc := range matrix.Cases {
+		key := tc.Fixture + "/" + tc.Check
+		if _, duplicate := actualKeys[key]; duplicate {
+			t.Fatalf("duplicate fixture matrix row %s", key)
+		}
+		actualKeys[key] = struct{}{}
+		if _, expected := expectedKeys[key]; !expected {
+			t.Fatalf("unexpected fixture matrix row %s", key)
+		}
+	}
+	for key := range expectedKeys {
+		if _, present := actualKeys[key]; !present {
+			t.Fatalf("fixture matrix is missing %s", key)
+		}
+	}
+	for _, tc := range matrix.Cases {
+		t.Run(tc.Fixture+"/"+tc.Check, func(t *testing.T) {
+			stdout, stderr, code := capture([]string{
+				"--fixture", fixturePath(t, tc.Fixture),
+				"--check", tc.Check,
+			})
+			if code != tc.Exit {
+				t.Fatalf("exit = %d, want %d; stdout %q stderr %q", code, tc.Exit, stdout, stderr)
+			}
+			if got := parseAnnotations(stdout); !slices.Equal(got, tc.Findings) {
+				t.Fatalf("findings = %v, want %v", got, tc.Findings)
+			}
+			conclusion := "success"
+			if code != 0 {
+				conclusion = "failure"
+			}
+			if conclusion != tc.CheckConclusion {
+				t.Fatalf("conclusion = %s, want %s", conclusion, tc.CheckConclusion)
+			}
+		})
 	}
 }
 
