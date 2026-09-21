@@ -22,9 +22,21 @@ runs:
         record_dir="${RUNNER_TEMP}/python-policy-baseline"
         mkdir -p "$record_dir"
         prefix="${record_dir}/sample-${SAMPLE}-${PHASE}"
+        if [[ -d .repo-ops/actions/repository-policy/.venv ]]; then
+          printf 'true\n' > "${prefix}.venv-before"
+        else
+          printf 'false\n' > "${prefix}.venv-before"
+        fi
+        if command -v uv >/dev/null 2>&1; then
+          printf 'true\n' > "${prefix}.uv-available-before"
+        else
+          printf 'false\n' > "${prefix}.uv-available-before"
+        fi
+        printf '%s\n' "${UV_CACHE_DIR:-}" > "${prefix}.uv-cache-dir-before"
         date +%s%N > "${prefix}.start-ns"
         python3 - "$prefix" >"${prefix}.monitor.log" 2>&1 <<'PY' &
         import os
+        import json
         import sys
         import time
         from pathlib import Path
@@ -33,6 +45,7 @@ runs:
         stop = Path(str(prefix) + ".stop")
         peak = 0
         observed = False
+        peak_processes = []
 
         def processes():
             result = {}
@@ -70,10 +83,26 @@ runs:
                         if parent in descendants and pid not in descendants:
                             descendants.add(pid)
                             changed = True
-                peak = max(peak, sum(table[pid][1] for pid in descendants if pid in table))
+                total = sum(table[pid][1] for pid in descendants if pid in table)
+                if total > peak:
+                    peak = total
+                    peak_processes = [
+                        {
+                            "pid": pid,
+                            "ppid": table[pid][0],
+                            "rss_kib": table[pid][1],
+                            "cmdline": table[pid][2],
+                        }
+                        for pid in sorted(descendants)
+                        if pid in table
+                    ]
             time.sleep(0.001)
         Path(str(prefix) + ".rss-kib").write_text(f"{peak}\n", encoding="utf-8")
         Path(str(prefix) + ".observed").write_text(f"{str(observed).lower()}\n", encoding="utf-8")
+        Path(str(prefix) + ".peak-processes.json").write_text(
+            json.dumps(peak_processes, indent=2) + "\n",
+            encoding="utf-8",
+        )
         PY
         printf '%s\n' "$!" > "${prefix}.monitor-pid"
     - id: validator
@@ -118,20 +147,31 @@ runs:
         import os
         from pathlib import Path
 
+        start_ns = int(os.environ["START_NS"])
+        end_ns = int(os.environ["END_NS"])
+        prefix = Path(os.environ["RUNNER_TEMP"]) / "python-policy-baseline" / f"sample-{os.environ['SAMPLE']}-{os.environ['PHASE']}"
         record = {
             "sample": int(os.environ["SAMPLE"]),
             "phase": os.environ["PHASE"],
             "check": os.environ["CHECK"],
             "action_outcome": os.environ["ACTION_OUTCOME"],
-            "wall_ms": (int(os.environ["END_NS"]) - int(os.environ["START_NS"])) // 1_000_000,
+            "start_ns": start_ns,
+            "end_ns": end_ns,
+            "wall_ms": (end_ns - start_ns) // 1_000_000,
             "peak_rss_kib": int(os.environ["PEAK_RSS_KIB"]),
+            "peak_processes": json.loads(Path(str(prefix) + ".peak-processes.json").read_text(encoding="utf-8")),
             "validator_process_observed": os.environ["OBSERVED"] == "true",
             "rss_method": "1ms /proc scan; sum VmRSS for validate.py roots and descendants",
             "runner_os": os.environ["RUNNER_OS"],
             "run_id": os.environ["GITHUB_RUN_ID"],
             "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
             "source_commit": "101f601f6022954d8b4e466d8280dc064f94e393",
-            "cache_state": "production setup-uv cache enabled; cold is first action invocation in this job; warm reuses same-job uv environment/cache",
+            "cache_observation": {
+                "validator_venv_before": Path(str(prefix) + ".venv-before").read_text(encoding="utf-8").strip() == "true",
+                "uv_available_before": Path(str(prefix) + ".uv-available-before").read_text(encoding="utf-8").strip() == "true",
+                "uv_cache_dir_before": Path(str(prefix) + ".uv-cache-dir-before").read_text(encoding="utf-8").strip(),
+            },
+            "cache_note": "production setup-uv cache enabled; phase names describe invocation order and check type, not a causal cache-only comparison",
         }
         path = Path(os.environ["RUNNER_TEMP"]) / "python-policy-baseline" / f"sample-{record['sample']}-{record['phase']}.json"
         path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
