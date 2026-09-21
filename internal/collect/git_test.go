@@ -173,6 +173,39 @@ func TestGitMetadataResourceCapsFailClosed(t *testing.T) {
 	}
 }
 
+func TestGitMetadataCountsRepeatedBlobPerPath(t *testing.T) {
+	src := t.TempDir()
+	git := gitTest{t: t, dir: src, env: gitIdentity(t)}
+	git.run("init", "--quiet", "--initial-branch=main")
+	git.run("commit", "--allow-empty", "-m", "base")
+	base := strings.TrimSpace(git.output("rev-parse", "HEAD"))
+	content := strings.Repeat("same compressed line\n", 64*1024)
+	for _, name := range []string{"one.txt", "two.txt", "three.txt"} {
+		writeFile(t, filepath.Join(src, name), content)
+	}
+	git.run("add", ".")
+	git.run("commit", "-m", "head")
+	head := strings.TrimSpace(git.output("rev-parse", "HEAD"))
+	bare := t.TempDir()
+	runGitDir(t, "", gitIdentity(t), "clone", "--bare", "--quiet", src, bare)
+	runGitDir(t, bare, gitIdentity(t), "update-ref", "refs/pull/10/head", head)
+	pr := map[string]any{
+		"number": 10,
+		"head":   map[string]any{"sha": head},
+		"base":   map[string]any{"repo": map[string]any{"clone_url": bare}},
+	}
+	const generous = int64(1 << 30)
+	_, _, err := gitMetadataWithLimits(context.Background(), pr, "", base, gitLimits{
+		fetchedObjectBytes: generous,
+		tempDiskBytes:      generous,
+		diffInputBytes:     int64(len(content) * 2),
+		diffOutputBytes:    generous,
+	})
+	if err == nil || !strings.Contains(err.Error(), "git logical changed-blob bytes exceeded limit") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func resourceCapRemote(t *testing.T) (map[string]any, string) {
 	t.Helper()
 	src := t.TempDir()

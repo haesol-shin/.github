@@ -19,13 +19,13 @@ import (
 )
 
 // The byte caps are 16× the largest measured PR 13/14 preparation sample:
-// 409447 aggregate object bytes, 240422 temporary bytes, 435438 logical
-// changed-blob bytes, and 383732 diff-output bytes.
+// 409447 aggregate object bytes, 240422 temporary bytes, 438762 logical
+// changed-blob bytes with per-path multiplicity, and 383732 diff-output bytes.
 const (
 	gitReadSize                 = 1024 * 1024
 	maxFetchedObjectBytes int64 = 6551152
 	maxTempDiskBytes      int64 = 3846752
-	maxDiffInputBytes     int64 = 6967008
+	maxDiffInputBytes     int64 = 7020192
 	maxDiffOutputBytes    int64 = 6139712
 	diskPollInterval            = 5 * time.Millisecond
 )
@@ -233,7 +233,7 @@ func checkDiffInputBytes(ctx context.Context, directory string, env []string, li
 	if err != nil {
 		return fmt.Errorf("git diff-tree: %w", err)
 	}
-	objects := make(map[string]struct{})
+	var names []string
 	zero := strings.Repeat("0", 40)
 	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
 		if line == "" {
@@ -245,16 +245,12 @@ func checkDiffInputBytes(ctx context.Context, directory string, env []string, li
 		}
 		for _, object := range metadata[2:4] {
 			if object != zero {
-				objects[object] = struct{}{}
+				names = append(names, object)
 			}
 		}
 	}
-	if len(objects) == 0 {
+	if len(names) == 0 {
 		return nil
-	}
-	names := make([]string, 0, len(objects))
-	for object := range objects {
-		names = append(names, object)
 	}
 	sort.Strings(names)
 	input := strings.Join(names, "\n") + "\n"
