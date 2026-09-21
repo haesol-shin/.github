@@ -73,6 +73,15 @@ func fragmentPath(filename, root string) bool {
 	return !strings.Contains(relative, "/") && strings.HasSuffix(relative, ".md") && relative != "README.md"
 }
 
+func supportedChangelogStatus(status string) bool {
+	switch status {
+	case "added", "modified", "renamed", "copied", "removed":
+		return true
+	default:
+		return false
+	}
+}
+
 func fragmentContent(state map[string]any, entry map[string]any) (string, bool) {
 	filename := asString(entry["filename"])
 	for _, key := range []string{"file_contents", "fragment_contents"} {
@@ -123,29 +132,41 @@ func validateChangelogState(state map[string]any, policy map[string]any, issue a
 		root = "changelog.d"
 	}
 
+	const unsupportedStatus = "changelog file status must be added, modified, renamed, copied, or removed"
 	var changedFragments, deletedFragments, directChangelog, releaseChangelog []map[string]any
 	for _, entry := range files {
 		filename := asString(entry["filename"])
 		status := strings.ToLower(asString(entry["status"]))
+		previous := asString(entry["previous_filename"])
+		changelogRelated := fragmentPath(filename, root) || normalizeSlash(filename) == "CHANGELOG.md" ||
+			fragmentPath(previous, root) || normalizeSlash(previous) == "CHANGELOG.md"
+		if changelogRelated && !supportedChangelogStatus(status) {
+			errors = append(errors, unsupportedStatus)
+			continue
+		}
 		if fragmentPath(filename, root) {
-			if status != "" && status != "removed" {
+			switch status {
+			case "added", "modified", "renamed", "copied":
 				changedFragments = append(changedFragments, entry)
-			}
-			if status == "removed" {
+			case "removed":
 				deletedFragments = append(deletedFragments, entry)
 			}
 		}
 		if status == "renamed" {
-			if previous := asString(entry["previous_filename"]); previous != "" && fragmentPath(previous, root) {
+			if previous != "" && fragmentPath(previous, root) {
 				deletedFragments = append(deletedFragments, map[string]any{
 					"filename": previous,
 					"status":   "removed",
 				})
 			}
+			if normalizeSlash(previous) == "CHANGELOG.md" {
+				directChangelog = append(directChangelog, entry)
+			}
 		}
 		if normalizeSlash(filename) == "CHANGELOG.md" {
 			directChangelog = append(directChangelog, entry)
-			if status != "" && status != "removed" {
+			switch status {
+			case "added", "modified", "renamed", "copied":
 				releaseChangelog = append(releaseChangelog, entry)
 			}
 		}

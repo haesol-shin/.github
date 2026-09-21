@@ -385,6 +385,54 @@ func TestRequiredDeclarationAcceptsCopiedOwnedFragment(t *testing.T) {
 	}
 }
 
+func TestOrdinaryPRRejectsRenamedChangelogPrevious(t *testing.T) {
+	files := []any{
+		map[string]any{
+			"filename":          "docs/history.md",
+			"status":            "renamed",
+			"previous_filename": "CHANGELOG.md",
+		},
+	}
+	state := withChangelogLine(t, fixtureChangelog, files, nil, "")
+	got := findings(t, state, CheckContract)
+	if !containsFinding(got, "ordinary pull requests must not edit CHANGELOG.md") {
+		t.Fatalf("expected CHANGELOG rename rejection, got %v", got)
+	}
+}
+
+func TestUnsupportedStatusCannotSatisfyRequiredOrRelease(t *testing.T) {
+	t.Run("required", func(t *testing.T) {
+		files := []any{
+			map[string]any{"filename": "changelog.d/42-validator.md", "status": "unchanged"},
+		}
+		contents := map[string]any{
+			"changelog.d/42-validator.md": "## Changed\n- Validate the trusted policy contract.\n",
+		}
+		state := withChangelogLine(t, "repo-ops.changelog.v1 kind:required value:fragment-added", files, contents, "")
+		got := findings(t, state, CheckContract)
+		if !containsFinding(got, "changelog file status must be added, modified, renamed, copied, or removed") {
+			t.Fatalf("expected unsupported status finding, got %v", got)
+		}
+		if !containsFinding(got, "required changelog declarations need an added or modified fragment") {
+			t.Fatalf("unchanged must not satisfy required, got %v", got)
+		}
+	})
+	t.Run("release", func(t *testing.T) {
+		files := []any{
+			map[string]any{"filename": "CHANGELOG.md", "status": "unchanged"},
+			map[string]any{"filename": "changelog.d/42-validator.md", "status": "removed"},
+		}
+		state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, nil, "")
+		got := findings(t, state, CheckContract)
+		if !containsFinding(got, "changelog file status must be added, modified, renamed, copied, or removed") {
+			t.Fatalf("expected unsupported status finding, got %v", got)
+		}
+		if !containsFinding(got, "release changelog declarations must update CHANGELOG.md") {
+			t.Fatalf("unchanged must not satisfy release, got %v", got)
+		}
+	})
+}
+
 func TestChangelogRecordAcceptsIndentation(t *testing.T) {
 	state := withChangelogLine(t, "    "+fixtureChangelog, nil, nil, "")
 	if got := findings(t, state, CheckContract); len(got) != 0 {
