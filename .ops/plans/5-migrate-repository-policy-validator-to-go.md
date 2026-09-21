@@ -2,22 +2,46 @@
 
 Issue: #5
 Current v1 intent: `sha256:1fe86d9dba7114bb75df62a4b31048ba11a9bb9eac4f3bc10fee17882cf71e11`
-Supersedes: `sha256:3c5898cf216583590419b74147ed57bf4af27a762d3ee5a470d93036a6750cb7`
-PR #7 smoke publisher: `fe229702e88cda5e1fb7ad142112edb50fd57c82` (`origin/main` after PR #9). Stage 1 goldens: Issue #11 repaired-base Python oracle after PR #10 rebases; regenerate before resuming.
+Supersedes plan: `sha256:0fa489baf002a59d2b43e541670722537fca6125bd84067c68d818497889e888` at plan commit `654d81f68ee1db5baf33c89016d3ddb659e98220`
+This file is not implementation authority. Stage 3 work is prohibited until this plan-only pull request merges after owner `repo-ops.plan-approval.v1` naming this file’s exact plan digest and head as `plan-commit`, and exact-head `repo-ops.merge-review.v1`. Merge is a separate user-authorized GitHub action; there is no additional merge-authorization comment schema.
 
 ## Approach
 
-Replace the production repository-policy validator with one Go implementation before `repo-ops/v0.1.0` is released. Preserve semantic findings (codes/meaning) and order, exit codes, canonical intent/plan/diff digests, check conclusions, event behavior, and trust boundaries. Machine contexts remain exactly `quality`, `contract`, and `merge approval`. Python is a temporary compatibility oracle only. After zero semantic divergence, delete the Python validator, uv, and validator runtime dependencies in one clean cutover. Rollback is a normal revert to the last Python production commit, not a second live implementation.
+Replace the production repository-policy validator with one Go implementation before `repo-ops/v0.1.0` is released. Preserve semantic findings and order, exit codes, canonical intent/plan/diff digests, check conclusions, event behavior, and trust boundaries. Machine contexts remain exactly `quality`, `contract`, and `merge approval`. Python is a temporary compatibility oracle only. After zero semantic divergence, delete the Python validator, uv, and validator runtime dependencies in one clean cutover. Rollback is a normal revert to the last Python production commit, not a second live implementation.
 
-The PR #7 smoke publisher SHA `fe229702e88cda5e1fb7ad142112edb50fd57c82` is immutable historical evidence. After Issue #11 merges, PR #10 regenerates `tests/testdata/go-oracle` and the differential corpus from the repaired-base Python oracle, then resumes Stage 1. Do not silently rebase the oracle onto later `main` except that authorized regeneration.
+Production at `origin/main` `8afe1f424dac005b2d409043cf899424303669b4` still evaluates policy with base-owned Python. Stage 1 and Stage 2 are merged history. Stage 3 is the remaining work, in two reviewable `Related #5` pull requests with one production validator at every instant:
+
+1. **Preparation** lands the final Go source, collector caps, changelog CLI, and Go behavioral tests. Production action, workflows, and quality command stay Python. After that merge, only the repository owner may build and publish the immutable `linux/amd64` artifact from that trusted `main` commit.
+2. **Cutover** is the single clean production cutover. It includes the real pin/provenance record at `actions/repository-policy/artifact.json`, the action rewrite, and Python/uv/harness deletion. The first merged Go production commit is executable immediately. There is no pinless fail-closed window and no long-lived dual production path.
+
+Production policy execution must not compile Go, restore a Go build cache, or fall back to Python.
 
 Compatibility does **not** freeze Python `jsonschema` or PyYAML diagnostic wording, argparse library text, or stdout/stderr whitespace. Do not require rendered workflow/job labels such as `CI / quality` or `Repository policy / contract`. Do not claim those UI strings as machine contexts.
 
-This plan does not rewrite `contracts/v0.1.0`, change policy outcomes, weaken coverage, migrate other repositories, move semantic reasoning into Go, alter repository rulesets, enable enforcement, tag, release, or adopt consumers. Issue #3 remains the release-train authority and waits for this cutover. Issue #5 pull requests use `Related #5`. Implementation pull requests after this plan-only artifact maintain one `changelog.d/5-go-validator.md` fragment. This plan-only pull request declares `Changelog: not-required`.
+This plan does not rewrite `contracts/v0.1.0`, change policy outcomes, weaken coverage, migrate other repositories, move semantic reasoning into Go, alter repository rulesets, enable enforcement, tag, release, or adopt consumers. Issue #3 remains the release-train authority and waits for this cutover. Issue #5 pull requests use `Related #5` and do not close Issue #5. Implementation pull requests maintain one `changelog.d/5-go-validator.md` fragment. This plan-only pull request declares `Changelog: not-required`.
 
-PR #7 is this unmerged plan-only pull request. Policy smoke is the **repaired merged-base** publisher (PR #9 on `fe229702e88cda5e1fb7ad142112edb50fd57c82`) evaluating and publishing onto the **unmerged PR #7 head**. `pull_request_target` does not run workflows from that head. Smoke must pass, then owner plan approval must land, then an exact-head evidence comment on that same 40-hex head must record the smoke outputs, before Stage 1 starts.
+The merged repository contract is authoritative. Generic Issue/PR heading names in templates and `contract.json` are advisory. Do not reintroduce blocking generic-heading findings or merge-review round counters.
 
-The merged repository contract is authoritative. Generic Issue/PR heading names in templates and `contract.json` are advisory. Do not reintroduce blocking generic-heading findings or merge-review round counters during the port.
+High-risk plan approval is the `repo-ops.plan-approval.v1` pull-request comment binding `issue`, `intent`, `plan`, and `plan-commit`. Exact-head review evidence is `repo-ops.merge-review.v1`. Actual merge is a separate user-authorized GitHub action; no additional merge-authorization comment schema exists, and none was used on PRs #2, #4, #6, #7, #9, #10, #12, or #13. Separate explicit approval remains mandatory for ruleset or required-check changes, tags and GitHub Releases, PyPI, consumer adoption, advisory-to-enforce transition, and platform-smoke failure disposition. Build and publication of the validator artifact are owner-only. If that publication uses a tag or GitHub Release, the existing separate tag/GitHub Release approval boundary applies. Plan approval does not publish anything. No section of this file is any of those approvals.
+
+### Settled history
+
+**Stage 1** merged as PR #10 squash `55e24b49f393cc48a424d24bdf680cfdc7ab0181`. It landed `cmd/repo-ops-validator --fixture`, `internal/{canonical,evaluate,schema,fixture}`, and `tests/testdata/go-oracle/` from the repaired-base Python oracle `654d81f68ee1db5baf33c89016d3ddb659e98220`. Production stayed Python.
+
+**Stage 2** merged as PR #13 squash `8afe1f424dac005b2d409043cf899424303669b4`. It landed `internal/collect`, live `--event`, ten validator replay bundles, three workflow-only intent-revocation bundles, advisory live shadow, and isolated benchmark record `tests/testdata/benchmarks/5-go-validator.json`. Production stayed Python. Exact-head review named head `12fc6b65a7b353eba01fe39a17979a06c01902ce` before squash.
+
+Stage 2 evidence to keep:
+
+- Validator replay: 10 bundles × 3 checks × Python/Go, zero divergence, independently adjudicated `expected.json`.
+- Workflow replay: 10 intent-revocation assertions; workflow-only bundles never invoke either validator.
+- Advisory live shadow: Python and Go both exited 1 with `no merge-ready receipt was found`; credential value absent from captured bytes.
+- Local prebuilt fixture cold start p50: Go 21 ms, Python 258 ms. These are not GitHub `ubuntu-latest` policy-path samples.
+- Empty-cache clean-CI p50: Go 26 s, Python 8 s. Go paid toolchain install, module download, and compile-every-run. That compile-every-run cost is why Stage 3 must not build on the live policy path.
+- Process-tree RSS p95: Go 9420 KiB, Python 57564 KiB.
+- Direct production dependency: `gopkg.in/yaml.v3@v3.0.1`. Toolchain `go 1.22.0` in `go.mod`.
+- Residual: collector bounds history depth (`--depth=1`) and the 2-minute live-collection deadline, but not aggregate fetched-object bytes or temp-disk use. No prebuilt-binary supply path or trusted production cache exists.
+
+Do not regenerate Stage 1 goldens, recreate Stage 2 bundles, or re-land the isolated benchmark workflow.
 
 ### Compatibility by finding class
 
@@ -32,18 +56,18 @@ The merged repository contract is authoritative. Generic Issue/PR heading names 
 | Diff digest | Exact SHA-256 of the specified external `git diff` stdout byte stream | `sha256sum` of that stream |
 | Secrets | Exact non-disclosure of the **injected secret value** | Scan captured bytes for that value, not the substring `GITHUB_TOKEN` |
 | Check conclusions | Empty findings → `success`; non-empty → `failure` | Derived from exit/findings |
-| Trust / events | Immutable base, no PR-head execution, same event behavior | Replay bundles below |
+| Trust / events | Immutable base, no PR-head execution, same event behavior | Committed replay bundles; one advisory live event |
 
-### Frozen current behavior
+### Frozen observable contracts
 
-The production entrypoint is `actions/repository-policy/validate.py`, invoked by `actions/repository-policy/action.yml` through `uv run --project … --locked python … --event "$GITHUB_EVENT_PATH" --check "${{ inputs.check }}"`. CI quality is `.github/workflows/ci.yml` job `quality` (`name: quality`) running `uv run --project actions/repository-policy --locked python -m unittest discover -s tests -v`. Live policy is `.github/workflows/policy.yml` (`pull_request_target`, `pull_request_review`, `issue_comment`) which clones the immutable base SHA, runs the composite action from `.repo-ops/actions/repository-policy`, and publishes check runs named `contract` and `merge approval` on the exact head from one Actions job `publish`. `.github/workflows/repository-policy.yml` is a reusable `workflow_call` entry with the same one-publisher shape; it is not the live central path and must not be called from `policy.yml`. Stage 3 wires **both** workflow files plus the composite action.
+Until the cutover merges, the production entrypoint remains `actions/repository-policy/validate.py`, invoked by `actions/repository-policy/action.yml` through `uv run --project … --locked python … --event "$GITHUB_EVENT_PATH" --check "${{ inputs.check }}"`. CI quality is `.github/workflows/ci.yml` job `quality` (`name: quality`) running `uv run --project actions/repository-policy --locked python -m unittest discover -s tests -v`. Live policy is `.github/workflows/policy.yml` (`pull_request_target`, `pull_request_review`, `issue_comment`) which clones the immutable base SHA, runs the composite action from `.repo-ops/actions/repository-policy`, and publishes check runs named `contract` and `merge approval` on the exact head from one Actions job `publish`. `.github/workflows/repository-policy.yml` is a reusable `workflow_call` entry with the same one-publisher shape; it is not the live central path and must not be called from `policy.yml`. Cutover rewires **both** workflow files plus the composite action to the pinned Go binary.
 
-CLI contract to preserve:
+CLI contract:
 
 - Exactly one of `--fixture` or `--event` is required; both or neither is an error with exit 2. Library argparse wording is not frozen.
 - `--check` choices: `all` (default), `contract`, `merge-approval`.
 - Exit 0 iff the findings list is empty; otherwise exit 1. Empty findings publish check conclusion `success`; non-empty publish `failure`.
-- Caught live failures (`OSError`, `RuntimeError`, `ValueError`, YAML parse errors) become a single finding and exit 1. Python `str(error)` / PyYAML wording is not frozen.
+- Caught live failures become a single finding and exit 1. Python `str(error)` / PyYAML wording is not frozen.
 - For `--check merge-approval`, evaluate contract first; if contract findings exist, insert `contract check did not succeed; merge approval is blocked` at index 0 of the merge-approval findings, then emit merge-approval findings.
 - Presentation: each evaluator finding is the suffix of `::warning title=Repository policy::{finding}`, in evaluator order.
 
@@ -60,46 +84,56 @@ Canonical digest algorithm (authoritative, language-independent; exact bytes):
 git -c core.quotePath=true diff --binary --full-index --no-color --no-ext-diff --no-textconv --no-renames refs/repo-ops/base refs/repo-ops/head --
 ```
 
-The Go collector must reproduce `git_metadata`: temp dir prefix `repo-ops-`, `git init --quiet`, fetch `refs/pull/{number}/head:refs/repo-ops/head` with `GIT_CONFIG_COUNT=1` `http.https://github.com/.extraheader=AUTHORIZATION: basic <base64(x-access-token:{token})>` when a token is present, require fetched HEAD to equal the GitHub API head SHA, `git cat-file -e {merge_base}^{commit}`, `git update-ref refs/repo-ops/base {merge_base}`, hash stdout in 1 MiB reads, fail on non-zero git status. Do not hash stderr. Do not rewrite diff text.
-
-GitHub collection to preserve:
+Live collection to preserve:
 
 - `GITHUB_TOKEN` required for live mode; `GITHUB_API_URL` default `https://api.github.com`.
-- User-Agent `repo-ops-validator/0.1`, `X-GitHub-Api-Version: 2022-11-28`, `Authorization: Bearer {token}`, 30s timeout.
+- User-Agent `repo-ops-validator/0.1`, `X-GitHub-Api-Version: 2022-11-28`, `Authorization: Bearer {token}`, 30s HTTP timeout.
 - Pagination follows `Link` `rel="next"`; list endpoints use `per_page=100`; check-runs use `field=check_runs`.
 - Policy YAML is loaded from immutable **base** SHA path `.github/repo-policy.yml`.
 - Added/modified fragment bytes are loaded from **head** SHA (data only).
 - Plan bytes for the current digest are loaded from **head** SHA; plan bytes for an approval commit are loaded from that commit; a plan-commit is accepted only when compare `{plan-commit}...{head}` status is `ahead` or `identical` and both digests equal the approval `plan` field.
-- Quality success is the last check-run whose `name` equals `policy.quality.check` (currently `quality`) and whose `conclusion` is `success`. Do not remap that string to a rendered `CI / quality` label during the port.
+- Quality success is the last check-run whose `name` equals `policy.quality.check` (currently `quality`) and whose `conclusion` is `success`. Do not remap that string to a rendered `CI / quality` label.
 - Reviews with empty body or `state == DISMISSED` are ignored.
-- Trusted code, schemas, and the action checkout are the immutable base SHA. Pull-request code is never executed.
+- Trusted code, schemas, pin/provenance document, and the action checkout are the immutable base SHA. Pull-request code is never executed.
+- External git: temp dir prefix `repo-ops-`, `git init --quiet`, fetch `refs/pull/{number}/head:refs/repo-ops/head` with `GIT_CONFIG_COUNT=1` `http.https://github.com/.extraheader=AUTHORIZATION: basic <base64(x-access-token:{token})>` when a token is present, require fetched HEAD to equal the GitHub API head SHA, `git cat-file -e {merge_base}^{commit}` and fetch the merge-base if missing, `git update-ref refs/repo-ops/base {merge_base}`, hash diff stdout in 1 MiB reads, fail on non-zero git status. Do not hash stderr. Do not rewrite diff text. Fetches use `--depth=1` and `--no-tags`. Live collection has a 2-minute deadline. Preparation adds aggregate fetched-object byte, temp-disk, and diff-output caps below.
 
-Generic Issue/PR headings are advisory: `validate_heading_contract` returns no findings. Templates and `contract.json` heading lists remain documentation. The `repo-ops.changelog.v1` record, authority lines, risk lines, and fenced machine records remain blocking. `repo-ops.merge-review.v1` field order is `verdict risk intent plan base head diff runtime model` with no `plan-round` or `implementation-round`.
+Generic Issue/PR headings are advisory: heading validation returns no findings. Templates and `contract.json` heading lists remain documentation. The `repo-ops.changelog.v1` record, authority lines, risk lines, and fenced machine records remain blocking. `repo-ops.merge-review.v1` field order is `verdict risk intent plan base head diff runtime model` with no `plan-round` or `implementation-round`.
 
-`changelog.py` is not the trusted live validator, but CI currently loads it through the same unittest module and `validate.py` imports `parse_fragment` for fragment body checks. Cutover deletes uv and the validator Python path; folding therefore moves into Go in stage 3 so no Python/uv validator setup remains. Until cutover, Python folding remains the oracle.
+`changelog.py` is not the trusted live validator. CI currently loads it through the same unittest module and `validate.py` imports `parse_fragment` for fragment body checks. Preparation lands `cmd/repo-ops-changelog` while Python folding remains the production oracle. Cutover deletes uv and the validator Python path, so folding is Go-only after that merge. CLI parity is `--root` (default `changelog.d`), `--changelog` (default `CHANGELOG.md`), `--version`, `--date`.
 
 Issue #5 already uses `## Acceptance`. This plan does not edit the Issue. Missing or reordered generic headings are not merge blockers.
 
+Committed replay corpus to keep and to replay with Go after cutover:
+
+- Validator bundles under `tests/testdata/events/validator/<name>/` with `webhook.json`, `http/`, `git/`, and `expected.json` of `{exit, findings, check_conclusion, plan_digest, diff_digest}`: `pull_request_target-opened`, `pull_request_target-edited`, `pull_request_target-reopened`, `pull_request_target-synchronize`, `pull_request_review-submitted`, `pull_request_review-edited`, `pull_request_review-dismissed`, `issue_comment-created-pr`, `issue_comment-edited-pr`, `issue_comment-deleted-pr`.
+- Workflow-only bundles under `tests/testdata/events/workflow/<name>/` with workflow expected check-run/revocation outputs: `issue_comment-created-intent`, `issue_comment-edited-intent`, `issue_comment-deleted-intent`. Do not invoke the validator binary on workflow-only bundles.
+
 ### Package and command boundaries
 
-One Go module at the repository root, module path `github.com/haesol-shin/.github`, `CGO_ENABLED=0`. Pin the toolchain in `go.mod` during stage 1 to a stable upstream series installable on `ubuntu-latest` without extra apt sources. No additional production bootstrap (no uv, no pip, no container image beyond `ubuntu-latest` + official Go setup).
+One Go module at the repository root, module path `github.com/haesol-shin/.github`, `CGO_ENABLED=0`, toolchain pinned in `go.mod`. After cutover, production policy runners do not install a Go toolchain, do not download modules, and do not compile.
 
 | Path | Responsibility |
 | --- | --- |
-| `cmd/repo-ops-validator` | CLI parity with `validate.py` `main()`: `--event`, `--fixture`, `--check` |
-| `cmd/repo-ops-changelog` | CLI parity with `changelog.py`: `--root`, `--changelog`, `--version`, `--date` (land by stage 3; may exist earlier as oracle-tested dead code not wired to production) |
+| `cmd/repo-ops-validator` | CLI parity: `--event`, `--fixture`, `--check` |
+| `cmd/repo-ops-changelog` | CLI parity with `changelog.py`: `--root`, `--changelog`, `--version`, `--date` (land in preparation; not production until cutover) |
 | `internal/canonical` | `normalize_text`, `canonical_digest`, `plan_digest` |
-| `internal/evaluate` | authority lines, records, intent chain, risk authority, changelog state, `validate_state`; headings remain advisory |
+| `internal/evaluate` | authority lines, records, intent chain, risk authority, changelog state, `validate_state`; headings remain advisory; must not import `net/http` or `os/exec` |
 | `internal/schema` | Draft 2020-12 evaluation; failures compared by schema/path/keyword, not Python message text |
-| `internal/collect` | `GitHubClient`, `build_live_state`, `api_content`, `git_metadata`, collaborator permissions |
+| `internal/collect` | `GitHubClient`, `build_live_state`, `api_content`, `git_metadata`, collaborator permissions, resource caps |
 | `internal/fixture` | `load_fixture` including `extends` / dotted `replace` |
-| `tests/testdata/go-oracle/compare.py` | Stage 1 checked-in differential harness (contract below; not part of this plan-only diff) |
+| `actions/repository-policy/artifact.json` | Single canonical base-owned pin/provenance document; landed in the cutover PR with the real digest; loaded only from the immutable base checkout |
+| `tests/testdata/go-oracle/` | Frozen Stage 1 goldens; after cutover compared by Go tests, not a Python runner |
+| `tests/testdata/events/` | Frozen Stage 2 replay corpus |
 
-Composite action remains `actions/repository-policy/action.yml`. Production wiring changes only in stage 3: build the validator from the immutable base checkout and exec the binary with the same `--event` / `--check` flags in `action.yml`, `.github/workflows/ci.yml`, `.github/workflows/policy.yml`, and `.github/workflows/repository-policy.yml`. Do not add a second composite action or a second check name.
+Composite action remains `actions/repository-policy/action.yml`. Do not add a second composite action or a second check name.
 
 Rejected alternatives:
 
-- Dual production Python+Go path after cutover.
+- Dual production Python+Go path after cutover, or any long-lived dual production path.
+- Merging a pinless Go production action that fail-closes until a later pin-only change.
+- Compiling Go on each policy run from the base checkout or from PR head.
+- Using Actions cache, module cache, or build cache as the production validator supply path or as a live fallback.
+- Treating SHA-256 equality of downloaded bytes as proof of `source_commit`.
 - Embedding CPython, PyOxidizer, or WASM-Python.
 - Replacing external git with go-git/git2go (byte stream would drift).
 - Renaming machine contexts or collapsing `contract` and `merge approval`.
@@ -107,267 +141,229 @@ Rejected alternatives:
 - Changing evaluator-authored finding text to be “more idiomatic”.
 - Freezing `jsonschema` / PyYAML diagnostic strings or stdout/stderr whitespace as cutover gates.
 - Reintroducing merge-review round counters or blocking generic-heading findings.
-- Silently rebasing the Stage 1 oracle SHA except the Issue #11 repaired-base regeneration.
-- Treating a live GitHub pull request as the Stage 2 replay oracle.
+- Treating a live GitHub pull request as the replay oracle.
 - New production dependency manager or container bootstrap.
+- Publishing the validator artifact as Issue #3 tag `v0.1.0` or any mutable branch/tag.
+- Storing the pin/provenance document anywhere other than `actions/repository-policy/artifact.json`.
 
-Dependencies: standard library for HTTP, git subprocess, JSON, SHA-256, and CLI. YAML parser only if it yields the same policy object as the frozen `.github/repo-policy.yml` data model (today: scalars, nested maps, one list). Prefer `gopkg.in/yaml.v3` only after a fixture proves equivalent `policy` objects. Vendor or `go.mod` sums are required before cutover. No `jsonschema`/`pyyaml`/uv in production after cutover.
+Dependencies after cutover: the pinned `linux/amd64` binary on the policy path; standard library plus `gopkg.in/yaml.v3@v3.0.1` in the built-from source. `go.mod` / `go.sum` remain for CI quality compilation of PR source. No `jsonschema` / `pyyaml` / uv in production after cutover.
 
-### Three reviewable implementation stages
+### Production packaging
 
-All stages are separate `Related #5` pull requests against the then-current `main`. High-risk plan approval on each implementation pull request names this plan digest and the plan commit that introduced it (or a later reviewed plan commit if this file changes). There is no plan-round or implementation-round limit.
+Stage 3 production path is a trusted-main, owner-authorized, once-built immutable artifact. It is not a compile-every-run path and not a cache-only path.
 
-**Stage 1 — freeze and fixture evaluator.** After Issue #11 merges, rebase PR #10 onto that exact `main` commit, set the pull request body to `repo-ops.changelog.v1 kind:required value:go-validator`, and export language-independent semantic golden artifacts from the repaired-base Python oracle only. Land `cmd/repo-ops-validator --fixture` plus `internal/{canonical,evaluate,schema,fixture}` with no GitHub or git collection. Land the checked-in harness. Production workflows stay Python. Changelog fragment `changelog.d/5-go-validator.md` is created here. Do not start this stage until PR #7 smoke, owner plan approval, the exact-head evidence comment, and the repaired-base golden regeneration exist.
+**Build.** From the exact preparation `origin/main` commit after that commit is on `main`, never from a pull-request head:
 
-**Stage 2 — collector, replay, shadow, benchmarks.** Implement `internal/collect` and live `--event`. Land deterministic **validator** replay bundles (webhook + recorded HTTP + git objects) and run both implementations against the same local API/git. Land separate **workflow-only** intent-revocation bundles with check-run/revocation expected outputs; those are not CLI matrix cases. A real pull request is advisory shadow only. Record benchmarks, including Go clean-CI from an isolated non-production procedure. Production workflows still call Python. Repair every semantic divergence; do not cut over.
+```text
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o repo-ops-validator ./cmd/repo-ops-validator
+```
 
-**Stage 3 — clean cutover.** Point `action.yml`, `ci.yml`, `policy.yml`, and `repository-policy.yml` at the Go binary built from the immutable base. Delete the Python validator path, uv, runtime dependencies, and the Stage 2 benchmark-only workflow. Port folding to `cmd/repo-ops-changelog`. Update `repo-policy.yml` `quality.commands` to the Go test invocation while keeping `quality.check: quality`. Replay committed **validator** event expected outputs with Go only. No dual path, no extra bootstrap.
+That is the only production architecture. The binary is built once per source commit that is authorized to run in production. Rebuild is a new owner-authorized publication, not a policy-job side effect. The cutover PR must not change production Go packages (`cmd/repo-ops-validator`, `cmd/repo-ops-changelog`, `internal/**`). If those packages must change after the artifact exists, restart from a new preparation merge and a new build.
+
+**Publication.** Only the repository owner builds and publishes the exact bytes. Overwriting a previously published digest is forbidden. The store must not be Issue #3 tag `v0.1.0`, a moving `v*` tag, a branch, or a cache key. If publication uses a tag or GitHub Release, the existing separate tag/GitHub Release approval boundary applies. Plan approval does not publish anything.
+
+**Provenance.** SHA-256 of downloaded bytes proves only that those bytes equal the pinned bytes. It does not prove they were produced from `source_commit`. Before the owner records the pin, a trusted main-only procedure must:
+
+1. Build from the exact preparation `source_commit` with the recipe above and the `go` toolchain that satisfies `go.mod` at that commit.
+2. Independently rebuild from the same commit, toolchain, `go.mod`/`go.sum` bytes, and recipe, and require identical `sha256` and `size`.
+3. Record a durable pin/provenance document binding all of the following. The action later verifies the digest **named by this record**, not a digest offered without provenance.
+
+**Pin/provenance schema.** The single canonical location is the base-owned JSON object `actions/repository-policy/artifact.json`, loaded only from the immutable base checkout, never from `pull_request.head`. Required fields, no others:
+
+| Field | Value |
+| --- | --- |
+| `source_commit` | 40 lowercase hex of the trusted `main` commit whose Go sources were built |
+| `toolchain` | Exact `go version` string used for both builds |
+| `goos` | `linux` |
+| `goarch` | `amd64` |
+| `cgo_enabled` | `"0"` |
+| `go_mod_sha256` | `sha256:` plus 64 lowercase hex of `go.mod` bytes at `source_commit` |
+| `go_sum_sha256` | `sha256:` plus 64 lowercase hex of `go.sum` bytes at `source_commit` |
+| `recipe` | Exact build command string above |
+| `sha256` | `sha256:` plus 64 lowercase hex of the `linux/amd64` binary bytes |
+| `size` | Decimal integer byte length of those binary bytes |
+| `uri` | Immutable URL of those exact bytes |
+
+Unknown fields, missing fields, wrong types, uppercase hex, missing `sha256:` prefix, non-40 `source_commit`, non-positive `size`, or any `goos`/`goarch`/`cgo_enabled` other than the table fail closed. The owner records this document only after the two builds match. A later source change that is allowed to run in production requires a new once-built artifact, a new matching rebuild, and a new pin.
+
+**Digest-before-exec.** The composite action, running from the immutable base checkout, must:
+
+1. Read the pin/provenance document from that base tree.
+2. Stream-download the object at `uri` into a runner-temp path that is not the repository workspace. Abort on timeout (30s, the existing HTTP timeout, unless the owner names another) or if received bytes would exceed `size`. Do not write more than `size` bytes.
+3. Require received length equals `size`. Compute SHA-256 over the received bytes and require equality with the provenance record’s `sha256`.
+4. Hash `go.mod` and `go.sum` in that same immutable base checkout and require equality with `go_mod_sha256` and `go_sum_sha256`. Refuse to exec unless `goos`/`goarch`/`cgo_enabled` match the table and `source_commit` is 40 lowercase hex. Do not substitute a branch name, tag, or `git describe`. Do not treat binary digest equality as source provenance.
+5. Set `REPO_OPS_CONTRACT_ROOT` to the immutable base checkout root that contains `contracts/v0.1.0/contract.json`, derived from `github.action_path` (the composite action directory’s repository root, two parents up), never from the caller workspace, never from PR head, never from the temp executable directory.
+6. Exec the verified file with `--event "$GITHUB_EVENT_PATH" --check "${{ inputs.check }}"` and that environment.
+
+Verification, including length and digest, runs on every policy execution, including warm runs. Missing pin, unparseable pin, download failure, timeout, length mismatch, digest mismatch, truncated or oversized body, or architecture mismatch is a finding and exit 1. The action must not exec an unverified file, must not compile, and must not fall back to cache or Python.
+
+**Authority and update lifecycle.**
+
+- **Create.** Repository owner only, after the preparation source commit is on `origin/main`. The owner runs the two matching builds and publishes the bytes. There is no additional artifact-create comment schema. If publication uses a tag or GitHub Release, that existing approval boundary applies. The first production pin is committed as `actions/repository-policy/artifact.json` in the cutover PR, so that PR’s merged tree is executable.
+- **Update.** Repository owner only. A later source change that is allowed to run in production requires a new once-built artifact, a new matching rebuild, and a new pin. Pin updates are not inferred from CI green.
+- **Unavailable.** Fail closed as above. There is no compile fallback, cache fallback, or Python fallback.
+- **No pinless production merge.** Do not merge an `action.yml` that requires the pin until `actions/repository-policy/artifact.json` in the same tree contains the real digest, size, and URI.
+
+**PR-source CI versus production policy.**
+
+- `.github/workflows/ci.yml` job `quality` after cutover checks out the reviewed source and runs `go test ./...`. It may install Go from `go.mod` and may use a CI module/build cache. That compilation is a quality check of PR source. It never publishes `contract` or `merge approval`, never supplies the production binary, and never writes the production pin. Until cutover, `quality` stays the Python unittest command.
+- `.github/workflows/policy.yml` and `.github/workflows/repository-policy.yml` never run `go build`, never run `setup-go`, never restore `GOCACHE`/`GOMODCACHE` for the validator, and never execute a binary from PR head or from an unverified download.
+
+### Cache-only is not the production path
+
+Cache-only is rejected as both the production path and a live fallback.
+
+Trust-domain isolation fails: GitHub Actions caches are not an owner-authorized, digest-pinned artifact. Cache keys can be populated by jobs that see untrusted pull-request writes or by a prior toolchain/OS/arch mix. Production policy must run bytes the owner published, not bytes the last writer of a cache key happened to store.
+
+Cache-miss compile cost is the Stage 2 measurement: empty-cache Go CI p50 26 s versus Python 8 s because the job installed a toolchain, downloaded modules, and compiled every sample. A production policy job that compiles on miss repeats that cost on the trusted path and makes latency a function of cache luck.
+
+Provenance is “whatever last filled this key”, not an owner-authorized `CGO_ENABLED=0 linux/amd64` build of `source_commit` with matching rebuild, `sha256`, and `size`. A digest-before-exec pin can be attached to a cache object only by turning the cache into an ad-hoc artifact store without immutability. That is the publication design without the authority boundary.
+
+Therefore: do not restore a Go build/module cache in `policy.yml` or `repository-policy.yml`; do not `go build` when the pin is missing; do not treat cache-hit as verification.
+
+### Collector resource bounds
+
+Preparation must close the Stage 2 residual in the binary that will be published. Live `GitMetadata` and live collection fail closed when any cap is exceeded. Exceeding a cap is a single finding and exit 1. Caps apply to the live collector, not to rewriting diff bytes.
+
+Required caps:
+
+- **Aggregate fetched-object bytes:** total git pack/object bytes fetched in one `GitMetadata` call, including the pull-head fetch and any merge-base fetch. Depth flags are not a substitute.
+- **Temp-disk:** peak size of the `repo-ops-` temporary directory, including objects, pack files, and diff spill.
+- **Diff-output bytes:** counted while hashing the specified `git diff` stdout; stop and fail closed before unbounded buffering.
+- **Time:** keep the Stage 2 2-minute live-collection deadline and 30s HTTP timeout; git subprocesses inherit the deadline.
+
+This plan does not invent numeric byte/disk caps. Stage 2 evidence records no fetched-object or temp-dir sizes. The owner must name the three numeric caps from measured replay-bundle and representative live-PR maxima plus documented headroom. Tune only from that evidence; do not pick round numbers without measurements. Record the measurements and the chosen caps in the preparation pull request.
 
 ## Execution
 
-1. Merge this plan-only pull request only after (a) owner `repo-ops.plan-approval.v1` naming this file’s plan digest and plan commit, (b) PR #7 policy smoke of the repaired merged base against this unmerged head has passed, and (c) an exact-head evidence comment on that same 40-hex head records the smoke recipe outputs. Do not start Go code before all three. Do not treat this draft as approval, merge, release, or ruleset authority.
+1. Merge this plan-only pull request after owner `repo-ops.plan-approval.v1` on the unchanged 40-hex head naming this file’s plan digest and that head as `plan-commit`, and exact-head `repo-ops.merge-review.v1`. Then merge it as a separate user-authorized GitHub action. Do not require a further merge-authorization comment. Do not start Stage 3 implementation before that merge. Do not treat this draft as merge, release, ruleset, artifact-publication, or cutover authority.
 
-2. **PR #7 policy smoke** (gates Stage 1). Vehicle: unmerged PR #7 head `$HEAD` (40-hex). Publisher: repaired merged base `fe229702e88cda5e1fb7ad142112edb50fd57c82`, not this head’s tree. Working directory may be any clone with `gh` authenticated read. Create an evidence directory, then run the whole recipe (do not stop after check-runs):
+2. The preparation pull request records the measured replay/live maxima and selected aggregate fetched-object, temp-disk, and diff-output caps in its evidence comment, with documented headroom. Exact-head implementation review evaluates those choices before its merge-ready receipt. Artifact download timeout defaults to the existing 30s HTTP timeout unless the reviewed implementation records evidence for a different value.
 
-```text
-mkdir -p .ops/evidence/5-go-validator/pr7-smoke
-HEAD="<40-hex unmerged PR #7 head>"
+   The single pin/provenance location is `actions/repository-policy/artifact.json`. The repository owner chooses the build vehicle, immutable store, and URI at publication time within this plan’s constraints; those operational values are captured in the provenance document rather than a new approval record.
 
-gh api --paginate "repos/haesol-shin/.github/commits/${HEAD}/check-runs?per_page=100" \
-  > .ops/evidence/5-go-validator/pr7-smoke/check-runs.json
+3. **Preparation pull request** against then-current `main`, `Related #5`, maintaining `changelog.d/5-go-validator.md`. High-risk plan approval on that pull request names this plan digest and this plan commit. Production stays Python. In that pull request:
 
-gh api --paginate "repos/haesol-shin/.github/actions/runs?head_sha=${HEAD}&per_page=100" \
-  > .ops/evidence/5-go-validator/pr7-smoke/workflow-runs.json
+   - Land collector caps with fail-closed tests.
+   - Land `cmd/repo-ops-changelog` with `changelog.py` CLI parity and move fragment parsing used by evaluation into Go.
+   - Land Go tests that cover the fixture matrix, digest vectors, schema-failure identity, validator event replay (inject a non-compiling binary or in-process evaluator; do not treat `go run` of PR head as production), collector trust tests, changelog folding, and cap failures.
+   - Do not change `action.yml`, `policy.yml`, `repository-policy.yml`, `ci.yml` quality command, or `repo-policy.yml` `quality.commands`.
+   - Do not add a dual production path, pin, or `setup-go` on policy jobs.
 
-jq -r '.workflow_runs[]?.id // empty' .ops/evidence/5-go-validator/pr7-smoke/workflow-runs.json \
-  > .ops/evidence/5-go-validator/pr7-smoke/run-ids.txt
+   After exact-head `repo-ops.merge-review.v1` on the unchanged preparation head, merge as a separate user-authorized GitHub action. Do not require a further merge-authorization comment. Production remains Python.
 
-: > .ops/evidence/5-go-validator/pr7-smoke/publish-job-id
-while IFS= read -r RUN_ID; do
-  [ -n "$RUN_ID" ] || continue
-  gh api --paginate "repos/haesol-shin/.github/actions/runs/${RUN_ID}/jobs?per_page=100" \
-    > ".ops/evidence/5-go-validator/pr7-smoke/jobs-${RUN_ID}.json"
-  jq -r '.jobs[] | [.id, .name, (.conclusion // "")] | @tsv' \
-    ".ops/evidence/5-go-validator/pr7-smoke/jobs-${RUN_ID}.json"
-  jq -r '.jobs[] | select(.name=="publish") | .id' \
-    ".ops/evidence/5-go-validator/pr7-smoke/jobs-${RUN_ID}.json" \
-    >> .ops/evidence/5-go-validator/pr7-smoke/publish-job-id
-done < .ops/evidence/5-go-validator/pr7-smoke/run-ids.txt
+4. **Owner-only build and publish.** After preparation is on `origin/main`, only the repository owner builds from that exact SHA (owner-local or a main-only owner procedure; never `pull_request`), independently rebuilds with the same vehicle class, recipe, and toolchain, requires identical `sha256` and `size`, and publishes the immutable artifact to a digest-immutable store that is not `v0.1.0` or a mutable ref. Plan approval does not publish anything. If publication uses a tag or GitHub Release, the existing separate tag/GitHub Release approval boundary applies. Do not record the pin on `main` yet.
 
-PUBLISH_JOB="$(head -n 1 .ops/evidence/5-go-validator/pr7-smoke/publish-job-id)"
-gh api "repos/haesol-shin/.github/actions/jobs/${PUBLISH_JOB}/logs" \
-  > .ops/evidence/5-go-validator/pr7-smoke/publish.log
-```
+5. **Python policy baseline** on GitHub `ubuntu-latest`, n ≥ 5, while Python is still production, before cutover. Stage 2 local 21 ms and empty-cache 26 s are not this baseline. Use the production policy surface:
 
-   Accept all of:
+   - Job: `.github/workflows/policy.yml` job `publish` (or an isolated measurement that invokes the same composite action with the same event payload, check order, runner OS, and permissions).
+   - Invocations: `--check contract` then `--check merge-approval`, matching production.
+   - Timing boundary: wall time of each composite-action invocation, recorded separately; also record job duration.
+   - RSS: process-tree VmRSS of the validator invocation on the runner; name the method in the record.
+   - Cold: first invocation in the job; no prior validator artifact on the runner.
+   - Warm: second same-job invocation; record cache state (what was reused; no Go compile cache exists on this path).
+   - Store every sample, then p50/p95.
 
-   - Latest check-run `quality` is `success` when CI passed.
-   - Latest check-runs `contract` and `merge approval` exist as custom results on `$HEAD`.
-   - No Actions **job** `name` equals `contract` or `merge approval`.
-   - An Actions job `name` equals `publish`.
-   - No check-run `name` equals `CI / quality`.
-   - `publish.log` contains a successful `uses: ./.repo-ops/actions/repository-policy` load (no YAML/`action.yml` parse error).
-   - Revoke-then-final may yield multiple check-run rows per policy context; that is not duplication of Actions jobs.
+6. **Advisory live zero-divergence** while Python is still production: one live event, Python production vs the published Go binary, same `--event`/`--check`, zero semantic divergence, credential value absent from captured bytes. Go-only replay of committed fixtures and validator bundles must already be silent from the preparation tests.
 
-   If smoke fails, do not start Go; repair against `main` or revert the PR #9 squash. Do not change rulesets to compensate.
+7. **Cutover pull request**, the single clean production cutover, `Related #5`, maintaining `changelog.d/5-go-validator.md`. High-risk plan approval names this plan digest and this plan commit. It must include the real pin/provenance document for the already-published artifact. In that pull request:
 
-   After owner `repo-ops.plan-approval.v1` on this head, post a PR comment on the **same** 40-hex head that quotes `check-runs.json` summaries, every Actions job name from `jobs-*.json`, and the `publish.log` excerpt proving composite load. Stage 1 must not start without that exact-head evidence comment.
+   - Add `actions/repository-policy/artifact.json` with the real provenance fields, digest, size, and URI. No dummy digest.
+   - Change `actions/repository-policy/action.yml` to the digest-before-exec procedure, including bounded streaming download, `REPO_OPS_CONTRACT_ROOT` from `github.action_path`, and the existing `--event` / `--check` flags. Do not install uv. Do not compile Go.
+   - Change `.github/workflows/ci.yml` job `quality` to `go test ./...` with Go installed from `go.mod`. That job compiles PR source for tests only.
+   - Keep `.github/workflows/policy.yml` and `.github/workflows/repository-policy.yml` on the one-publisher shape, immutable-base checkout, and check names `contract` and `merge approval`. They consume the rewired composite action and must not gain `setup-go` or `go build`.
+   - Change `.github/repo-policy.yml` `quality.commands` to `go test ./...` while keeping `quality.check: quality`.
+   - Update `changelog.d/README.md` folding command to `cmd/repo-ops-changelog` with the same `--version` / `--date` flags. Update every remaining in-repo operator document that instructs `uv run`, `validate.py`, or `python actions/repository-policy/changelog.py` for this validator. Do not rewrite historical `.ops/plans/` for other Issues.
+   - Fold the cutover into `changelog.d/5-go-validator.md`. Do not edit `CHANGELOG.md`; Issue #3 folding remains the release train.
+   - Delete `.github/workflows/5-go-validator-benchmark.yml`.
+   - Delete the Python inventory and convert or delete every Python-dependent harness listed below. Frozen JSON, goldens, and event bundles stay.
+   - Do not modify production Go packages. Do not add a dual path, compatibility shim, feature flag, or fallback.
+   - Trust tests must exercise the **exact** composite-action invocation: pin from a base-like tree, download to temp, `REPO_OPS_CONTRACT_ROOT` from the action-path analog, `--event` and `--check`. `go run` from the workspace is not that test.
 
-3. **Stage 1 freeze.** From repository root, using the Python oracle **only** at the Issue #11 repaired `main` commit, write golden files under `tests/testdata/go-oracle/` (gitignored working copy under `.ops/evidence/5-go-validator/oracle/` is acceptable during authoring):
+   After exact-head `repo-ops.merge-review.v1` on the unchanged cutover head, merge as a separate user-authorized GitHub action. Do not require a further merge-authorization comment. The merged tree is immediately executable.
 
-   - For every `fixtures/*.json` except `changelog-conformance.json` and `intent-comment-revocation.json`, run `--check all`, `--check contract`, and `--check merge-approval`.
-   - Capture `{exit, findings, check_conclusion}` where `findings` is every `::warning title=Repository policy::` suffix in order, and `check_conclusion` is `success` iff `exit == 0` else `failure`. Do not treat full stdout/stderr bytes as goldens.
-   - Commit explicit digest vectors `tests/testdata/go-oracle/digests.json` from `tests/test_validator.py` intent and plan cases (exact `sha256:` bytes). The harness compares both implementations to this file.
-   - Capture schema-failure identity by feeding each frozen schema an empty object and each required-field omission: record schema label, instance path, and keyword/code, not Python `error.message`.
-   Commit goldens with the Go evaluator and the harness. `go test ./internal/... ./cmd/repo-ops-validator` must pass without network.
+8. **Deletion inventory** (empty on `main` after cutover):
 
-4. **Stage 1 differential harness contract** (landed in Stage 1 as `tests/testdata/go-oracle/compare.py`; this plan-only PR does not add it). The harness, not an inline snippet, is the comparison authority:
+   - `actions/repository-policy/validate.py`
+   - `actions/repository-policy/changelog.py`
+   - `actions/repository-policy/pyproject.toml`
+   - `actions/repository-policy/uv.lock`
+   - `actions/repository-policy/.python-version`
+   - `astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78` from `action.yml` and `ci.yml`
+   - `uv run --project … python …` production and CI steps
+   - Python-only unittest runner from CI
+   - `tests/test_validator.py` after Go behavioral coverage
+   - `tests/testdata/go-oracle/compare.py` (delete or replace with a Go-only reader; do not leave a Python executable that imports the removed validator or `jsonschema`)
+   - `tests/testdata/events/replay.py` (delete or replace with a Go-only reader that injects a non-compiling binary; do not leave a default `python,go` runner)
+   - `tests/testdata/benchmarks/collect_local.py` (delete or replace; do not leave a runner that requires uv or `validate.py`)
+   - `.github/workflows/5-go-validator-benchmark.yml`
 
-   - Create the output directory (`mkdir -p`); do not assume it exists.
-   - Run Python then Go for each fixture × check; capture stdout, stderr, and exit into separate files. Expected nonzero exits must not abort the matrix (`exit` is written after each process; the harness continues).
-   - Parse ordered finding payloads from `::warning title=Repository policy::` suffixes.
-   - Compare `{exit, findings, check_conclusion}` per the compatibility table.
-   - Compare canonical intent/plan (and, when present, diff) digests to `tests/testdata/go-oracle/digests.json`, not by scraping stdout.
-   - Inject a distinct secret value into the child environment (the token string actually passed). Fail if that **value** appears in stdout, stderr, or step summary. Do not treat the literal substring `GITHUB_TOKEN` as the leak oracle.
-   - Do not `cmp` stdout, stderr, or step-summary files.
+   Do not delete `contracts/`, `fixtures/` JSON states, `.github/repo-policy.yml`, check publication logic, committed `tests/testdata/go-oracle/` goldens, `tests/testdata/events/validator/*/expected.json`, or `tests/testdata/events/workflow/*/expected.json`.
 
-   `$FIXTURE` is every file in `fixtures/*.json` that `load_fixture` accepts as a validator state (`changelog-conformance.json` is folding-only; `intent-comment-revocation.json` is workflow-only). `$CHECK` is `all`, `contract`, and `merge-approval`. Working directory is the repository root. `GITHUB_STEP_SUMMARY` is unset during comparison so summary presentation cannot mask finding payloads.
+9. **Post-cutover Go policy samples** on the same GitHub `ubuntu-latest` surface, n ≥ 5, same event, check order, timing boundary, and RSS method as the Python baseline. Cold is the first composite-action invocation in the job with no prior artifact on the runner (download, length check, digest, exec). Warm is the second same-job invocation that still verifies length and digest before exec; record cache state (verified file reused or HTTP cache of the immutable blob; never a compile cache). Compare Go p50/p95, peak RSS p95, policy-path step count, and production dependency count to the Python policy baseline, not to Stage 2 local or empty-cache CI figures. Any worse Go value requires an `explanations[]` entry. Measurements are evidence only and never retain Python. Verify post-merge `quality` on the exact cutover `main` SHA.
 
-5. **Stage 1 Go package rules.** `internal/evaluate` must not import `net/http` or `os/exec`. `internal/collect` must not be referenced from fixture tests. Evaluator-authored finding order equals Python append order in `validate_state` / `validate_changelog_state`.
+10. **Compatibility, security, and exact-head review** required on each implementation head before merge:
 
-6. **Stage 2 collector.** Implement live `--event` with the frozen HTTP, pagination, base-owned policy load, head-owned fragment/plan load, permission lookup, and external-git hashing. Unit-test collectors with recorded HTTP fixtures, not the live API.
+    - Preparation: Go tests silent against committed `{exit, findings, check_conclusion, plan_digest, diff_digest}` for every fixture and validator event bundle; workflow-only bundles asserted by workflow expected outputs; cap and folding tests pass; production still Python.
+    - Cutover: the same Go-only replay; trust tests prove pin, schemas, action, policy YAML, and `REPO_OPS_CONTRACT_ROOT` come from base; head modifications of `actions/repository-policy/**` or `contracts/**` do not change findings relative to base-owned copies; PR-head Python/Go is not executed; workflow permissions remain `contents: read`, `issues: read`, `pull-requests: read`, `checks: write`; the binary does not request scopes.
+    - Artifact failure paths in tests: missing pin, unparseable pin, unknown field, wrong `goos`/`goarch`/`cgo_enabled`, unreachable `uri`, timeout, empty body, truncated body, oversized body, length mismatch, SHA-256 mismatch, `go.mod`/`go.sum` digest mismatch against the base checkout, missing `REPO_OPS_CONTRACT_ROOT`, `REPO_OPS_CONTRACT_ROOT` pointing at caller workspace or PR head, and attempt to exec before length and digest equality. Each fails closed with no fallback.
+    - External-git byte hashes still match `sha256sum` of the specified `git diff` stream, including binary file, `core.quotePath` path, deletion, and empty diff.
 
-7. **Stage 2 deterministic replay bundles.** Split two classes. Do not mix them.
-
-   **Validator bundles** live under `tests/testdata/events/validator/<name>/`:
-
-   | Member | Role |
-   | --- | --- |
-   | `webhook.json` | Sanitized `policy.yml` delivery (`github.event`); tokens/authorization/extraheader values replaced by `REDACTED` |
-   | `http/` | Recorded GitHub API responses (method+path+query), including pagination `Link` bodies |
-   | `git/` | Git objects or a bundle sufficient to reproduce `refs/repo-ops/base` and `refs/repo-ops/head` |
-   | `expected.json` | `{exit, findings, check_conclusion, plan_digest, diff_digest}` only — committed for Python/Go CLI comparison and Go-only post-cutover binary replay |
-
-   Both Python and Go **must** consume the same local HTTP and local git from that bundle. Do not call live GitHub or a real working tree during the validator CLI matrix. A real pull request shadow run is advisory evidence only, not the replay oracle.
-
-   Required **validator** bundle names (minimum set; add rather than drop):
-
-   | Directory | `github.event_name` | `action` | Purpose |
-   | --- | --- | --- | --- |
-   | `pull_request_target-opened` | `pull_request_target` | `opened` | first contract+merge-approval publication |
-   | `pull_request_target-edited` | `pull_request_target` | `edited` | body/title authority change |
-   | `pull_request_target-reopened` | `pull_request_target` | `reopened` | re-open |
-   | `pull_request_target-synchronize` | `pull_request_target` | `synchronize` | exact-head change |
-   | `pull_request_review-submitted` | `pull_request_review` | `submitted` | merge-review/plan-approval on review |
-   | `pull_request_review-edited` | `pull_request_review` | `edited` | stale review body |
-   | `pull_request_review-dismissed` | `pull_request_review` | `dismissed` | dismissed reviews ignored by collector |
-   | `issue_comment-created-pr` | `issue_comment` | `created` | PR comment with plan-approval or merge-review |
-   | `issue_comment-edited-pr` | `issue_comment` | `edited` | approval edit revocation |
-   | `issue_comment-deleted-pr` | `issue_comment` | `deleted` | approval deletion revocation |
-
-   The Stage 1 harness (or a Stage 2 extension of it) runs both implementations against **validator** bundles only and compares `{exit, findings, check_conclusion, plan_digest, diff_digest}` to `expected.json` and to each other. Secret scan uses the injected bundle token **value**.
-
-   **Workflow-only intent-revocation bundles** live under `tests/testdata/events/workflow/<name>/`. They cover Issue (non-PR) `issue_comment` deliveries that `policy.yml` job `intent-revocation` handles. They are **not** validator CLI inputs.
-
-   | Member | Role |
-   | --- | --- |
-   | `webhook.json` | Sanitized Issue comment delivery (`created` / `edited` / `deleted`) |
-   | `http/` | Recorded list of linked open pull heads and Checks API revoke POSTs |
-   | `expected.json` | Workflow-level `{job, linked_open_pull_heads, check_runs: [{name, conclusion, head_sha}]}` — not `{exit, findings, …}` |
-
-   Required **workflow-only** bundle names (minimum set; add rather than drop):
-
-   | Directory | `github.event_name` | `action` | Purpose |
-   | --- | --- | --- | --- |
-   | `issue_comment-created-intent` | `issue_comment` | `created` | Issue intent comment; revoke linked open PR heads |
-   | `issue_comment-edited-intent` | `issue_comment` | `edited` | intent supersession; revoke |
-   | `issue_comment-deleted-intent` | `issue_comment` | `deleted` | intent deletion; revoke |
-
-   Workflow expected `check_runs` are `contract` and `merge approval` with `conclusion: failure` on each linked open pull `head_sha`. Replay these by asserting `intent-revocation` job control flow and recorded Checks API outputs. **Exclude** them from the Python/Go CLI matrix and from Go-only binary replay. Do not invoke `cmd/repo-ops-validator` or `validate.py` on workflow-only bundles.
-
-8. **Stage 2 immutable-base trust checks** (must fail closed in tests):
-
-- Validator binary, `action.yml`, schemas, and `.github/repo-policy.yml` used by production come from the base SHA checkout under `.repo-ops`, never from `pull_request.head`.
-- A fixture where head modifies `actions/repository-policy/**` or `contracts/**` does not change findings relative to base-owned copies.
-- The injected secret **value** is not present in stdout, stderr, or step summary.
-- Workflow permissions remain `contents: read`, `issues: read`, `pull-requests: read`, `checks: write` on policy jobs; the Go binary does not request scopes.
-- Executing PR-head Python/Go is a failed trust test, not a feature.
-
-9. **Stage 2 external-git byte hashing evidence.** For a known merge-base/head pair inside a replay bundle’s `git/`:
-
-```text
-git -c core.quotePath=true diff --binary --full-index --no-color --no-ext-diff --no-textconv --no-renames "$BASE" "$HEAD" -- | sha256sum
-```
-
-The validator `diff_digest` must equal `sha256:` plus that hex. Include a binary file, a path needing `core.quotePath`, a deletion, and an empty diff. Go-git hashes are not evidence.
-
-10. **Stage 2 benchmark evidence** (record, do not gate cutover). Production `quality` stays Python until Stage 3, so it cannot produce Go clean-CI samples. Collect Go clean-CI from an **isolated benchmark-only** workflow on the Stage 2 branch, not from production `ci.yml` / `policy.yml`.
-
-   Land `.github/workflows/5-go-validator-benchmark.yml` on the Stage 2 branch only:
-
-   - Job name is not `quality`, `contract`, or `merge approval`.
-   - Does not publish Checks API results and does not change production wiring.
-   - Runs the **exact** proposed Stage 3 quality command (`go test ./...`) from the Stage 2 tree.
-   - Empty cache each sample (no restored Go/module/action caches).
-   - n ≥ 5 comparable samples (matrix or repeated `workflow_dispatch`).
-   - Delete this workflow in the Stage 3 cutover PR; it is not production.
-
-   Write `tests/testdata/benchmarks/5-go-validator.json` with per-language raw samples and summaries:
-
-```json
-{
-  "oracle_commit": "<40-hex Issue #11 repaired main>",
-  "go_commit": "<40-hex>",
-  "local_cold_start_ms": {
-    "python": {"samples": [], "p50": 0, "p95": 0, "n": 0},
-    "go": {"samples": [], "p50": 0, "p95": 0, "n": 0}
-  },
-  "clean_ci_wall_ms": {
-    "python": {"samples": [], "p50": 0, "p95": 0, "n": 0, "source": "production quality job"},
-    "go": {"samples": [], "p50": 0, "p95": 0, "n": 0, "source": "5-go-validator-benchmark.yml"}
-  },
-  "peak_rss_kib": {
-    "python": {"samples": [], "p50": 0, "p95": 0, "n": 0},
-    "go": {"samples": [], "p50": 0, "p95": 0, "n": 0}
-  },
-  "workflow_steps": {"python": 0, "go": 0},
-  "production_dependencies": {"python": ["jsonschema==4.25.1", "pyyaml==6.0.2", "uv"], "go": ["<module>@<version>", "..."]},
-  "explanations": []
-}
-```
-
-Commands: local cold start is the wall time of a fresh process `--fixture fixtures/valid-high.json --check all` after dropping OS file cache when practical; n ≥ 5; store every sample then p50/p95. Peak RSS is max `ru_maxrss` / equivalent per run, with the same sample/summary shape. Python clean-CI wall is the production `quality` job duration on an empty-cache workflow_run. Go clean-CI wall is the isolated benchmark workflow duration for `go test ./...` on an empty cache, n ≥ 5; it is not the production `quality` job. Workflow step count for Go is the **proposed** production `policy.yml` step count after cutover (counted from the Stage 2 tree’s intended wiring), not the benchmark-only job. Dependency count is production trusted-path modules only.
-
-Any worse Go **p95**, **peak RSS p95**, **workflow step count**, or **production dependency count** versus Python is a regression and requires an `explanations[]` entry. Benchmarks are evidence only. They never authorize retaining Python.
-
-11. **Stage 3 cutover.** In one pull request: build `repo-ops-validator` from the base checkout in `action.yml`, `policy.yml`, **and** `repository-policy.yml`; replace CI `uv run … unittest` with `go test ./...`; change `quality.commands` to that Go test line; wire `cmd/repo-ops-changelog` for release folding; delete the Python inventory below and `.github/workflows/5-go-validator-benchmark.yml`; keep check publication names `contract` and `merge approval`. After merge, verify post-merge `quality` on the exact `main` SHA.
-
-12. **Deletion inventory (stage 3, complete cutover):**
-
-- `actions/repository-policy/validate.py`
-- `actions/repository-policy/changelog.py`
-- `actions/repository-policy/pyproject.toml`
-- `actions/repository-policy/uv.lock`
-- `actions/repository-policy/.python-version`
-- `astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78` from `action.yml`, `ci.yml`, `policy.yml`, and `repository-policy.yml`
-- `uv run --project … python …` production steps
-- Python-only unittest runner from CI (tests themselves move to `go test`)
-- `.github/workflows/5-go-validator-benchmark.yml`
-
-Do not delete `contracts/`, `fixtures/` JSON states, `.github/repo-policy.yml`, check publication logic, committed `tests/testdata/events/validator/*/expected.json`, or `tests/testdata/events/workflow/*/expected.json`. `tests/test_validator.py` is deleted only when Go tests cover the same observable contracts.
-
-13. **Post-cutover verification.** Replay every frozen fixture and every **validator** event bundle with the Go binary only against committed `{exit, findings, check_conclusion, plan_digest, diff_digest}`. Do not run the binary against workflow-only intent-revocation bundles; confirm those with workflow expected check-run/revocation outputs. Confirm check-run names remain `quality`, `contract`, and `merge approval`. Confirm `Related #5` still does not close Issue #5. Do not tag `v0.1.0`, protect `v*`, publish a GitHub Release, change rulesets, or close Issue #3.
-
-14. **Rollback.** Revert the stage 3 squash commit (or the contiguous cutover commits) to restore the last Python production commit. Do not land a feature flag or parallel action. Stages 1–2 rollback is likewise revert; Python remains production until stage 3 merges.
+11. **Rollback.** Revert the cutover squash to restore the last Python production commit (the preparation `main` SHA, or a later Python-production SHA if `main` moved). Revert of preparation is a normal revert and does not change production wiring. Do not land a feature flag or parallel action. Do not keep the Go pin as a live fallback after revert.
 
 ## Verification and recovery
 
-### Plan-only pull request (this change)
+### This plan-only pull request
 
-The diff must contain only `.ops/plans/5-migrate-repository-policy-validator-to-go.md`. No Go code, fixtures, changelog fragments, workflows, tests, harness, or contract edits. Policy smoke is the repaired merged-base publisher on this unmerged head. Expected live checks:
+The diff contains this plan plus removal of `TestPlanDigestRealPlanBytes`, which pinned the previous plan’s source bytes and made every legitimate plan revision fail `go test ./...`. Canonical digest behavior remains covered by fixed known-answer vectors; mutable plan prose is authority through the approved plan digest and commit, not a compiled test constant. No implementation code, fixtures, changelog fragments, workflows, harness, pin, or contract edits are allowed.
 
-- `quality` — pass if the plan file does not affect unittest discovery.
-- `contract` — fail closed until owner plan approval exists.
+- `quality` and the advisory Go benchmark jobs — pass; neither treats mutable plan source text as a compiled constant.
+- `contract` — fail closed until owner plan approval names this file’s exact digest and plan commit.
 - `merge approval` — fail closed unless contract succeeded and an exact-head `repo-ops.merge-review.v1` exists.
 
-Those publications are the proof that the repaired base-owned contexts exist. Do not interpret a failed contract on this draft as permission to change the contract or skip later stages. Owner plan approval, passing smoke recipe, and the exact-head evidence comment are gates on merging this plan and on starting Go, not Go work itself.
+Do not interpret a failed contract on this draft as permission to change the contract or to start Stage 3. Merge this plan-only pull request after owner `repo-ops.plan-approval.v1` and exact-head `repo-ops.merge-review.v1`; then merge it as a separate user-authorized GitHub action. Do not require a further merge-authorization comment. The current committed plan digest `sha256:0fa489baf002a59d2b43e541670722537fca6125bd84067c68d818497889e888` is superseded by this file; implementation requires that merge of the **new** exact digest and plan commit.
 
-### Stage 1 acceptance
+### Stage 1 and Stage 2
 
-- Checked-in harness comparison is silent for every fixture × check matrix: matching exit codes, ordered evaluator findings, structured schema/YAML identities, and check conclusions.
-- Intent/plan canonical digests match `tests/testdata/go-oracle/digests.json` (exact digest bytes).
-- Harness creates its output directory, continues after expected nonzero exits, and scans the injected secret value.
-- `internal/evaluate` has no network or git.
-- Production workflows still invoke Python.
+Already merged at the SHAs above. Do not re-gate them. Durable contracts and replay artifacts remain binding on Stage 3.
 
-### Stage 2 acceptance
+### Preparation acceptance
 
-- Validator event bundles include webhook, recorded HTTP, git objects, and `{exit, findings, check_conclusion, plan_digest, diff_digest}`.
-- Workflow-only intent-revocation bundles include webhook, recorded HTTP, and check-run/revocation expected outputs; they are absent from the CLI matrix.
-- Validator replay matrix has zero Python/Go divergence against those expected artifacts using the same local API/git. Live PR shadow is advisory only.
-- Trust tests prove base-owned code load and non-execution of head code.
-- External-git byte hashes match `sha256sum` of the specified `git diff` stream.
-- Injected secret values never appear in stdout, stderr, or step summary.
-- Go clean-CI samples come from the isolated benchmark-only workflow (n ≥ 5, empty cache, exact proposed `go test ./...`), not production `quality`.
-- Benchmark JSON includes per-language samples and summaries; unexplained worse Go p95/RSS/steps/dependency count blocks the stage 2 merge; explained regressions still do not retain Python.
+- Production path is still Python in `action.yml`, `ci.yml`, `policy.yml`, `repository-policy.yml`, and `repo-policy.yml` `quality.commands`.
+- Collector caps and `cmd/repo-ops-changelog` are on `main`.
+- Go tests cover the observable contracts listed above without changing production wiring.
+- Owner `repo-ops.plan-approval.v1` and exact-head `repo-ops.merge-review.v1` existed for the merged preparation head; merge was a separate user-authorized GitHub action.
+- The repository owner built and published the artifact from that `main` SHA after two matching trusted-main builds; `actions/repository-policy/artifact.json` is not yet required on `main`.
+- Python policy baseline n ≥ 5 is recorded on the production policy surface.
+- Advisory live Python-vs-Go event showed zero semantic divergence.
 
-### Stage 3 acceptance
+### Cutover acceptance
 
-- Production path runs one Go binary from immutable base in `action.yml`, `ci.yml`, `policy.yml`, and `repository-policy.yml`.
-- Deletion inventory is empty on `main`.
-- No `uv`, `jsonschema`, `pyyaml`, or `validate.py`.
+- Production policy path runs one owner-built `linux/amd64` binary from the immutable base after provenance-named SHA-256 and size verification in `action.yml`, `policy.yml`, and `repository-policy.yml`.
+- The merged cutover tree contains the real pin at `actions/repository-policy/artifact.json` and is executable without a follow-up pin commit.
+- `REPO_OPS_CONTRACT_ROOT` is set from `github.action_path` to the immutable base checkout; trust tests cover that exact invocation.
+- CI quality is `go test ./...`; `quality.check` remains `quality`.
+- No policy-path `go build`, `setup-go`, Go cache restore, uv, `jsonschema`, `pyyaml`, `validate.py`, `compare.py`, `replay.py`, or `collect_local.py`.
+- Pin/provenance schema matches the table; length and digest are verified before every exec; unavailable artifact fails closed.
+- Collector aggregate fetched-object, temp-disk, and diff-output caps are enforced and fail closed; time limits remain.
+- Deletion inventory is empty on `main`. Frozen goldens and event expected files remain.
+- `cmd/repo-ops-changelog` is the folding command; `changelog.d/README.md` matches it.
 - Machine contexts remain `quality`, `contract`, and `merge approval`.
 - Go-only binary replay matches committed validator `expected.json` for every fixture and validator event bundle. Workflow-only bundles are not binary-replayed.
-- Rollback drill documented as `git revert` of the cutover squash.
+- Post-cutover Go policy cold/warm samples are compared to the pre-cutover Python policy baseline on the same surface.
+- Security review and exact-head `repo-ops.merge-review.v1` existed for the merged cutover head; merge was a separate user-authorized GitHub action.
+- `Related #5` still does not close Issue #5.
+- Rollback is `git revert` of the cutover squash to the last Python production commit.
+- No `v0.1.0` tag, `v*` protection, GitHub Release for the contract, ruleset change, Issue #3 close, or consumer adoption.
 
 ### Negative cases (must remain failing with the same evaluator findings or structured schema identity)
 
-Invalid fixtures already on `main`: `invalid-missing-field.json`, `invalid-diff-digest.json`, `invalid-stale-head.json`, `invalid-direct-changelog.json`, `invalid-fragment-deletion.json`, `invalid-fragment-owner.json`, `invalid-fragment-section.json`, `invalid-required-missing.json`. Additional evaluator negatives already covered by `tests/test_validator.py`: fenced false authority, legacy-after-v1, broken supersession, non-owner high-risk plan approval, shared-identity vs native review, argparse both/neither input (exit 2), merge-approval blocked by contract, fetched HEAD mismatch, missing `GITHUB_TOKEN`, unsupported content encoding, paginated non-list, and noncanonical record spacing. Schema required-field omissions must still fail with structured identity; the Python `jsonschema` sentence is not the identity.
+Invalid fixtures already on `main`: `invalid-missing-field.json`, `invalid-diff-digest.json`, `invalid-stale-head.json`, `invalid-direct-changelog.json`, `invalid-fragment-deletion.json`, `invalid-fragment-owner.json`, `invalid-fragment-section.json`, `invalid-required-missing.json`. Additional evaluator negatives already covered: fenced false authority, legacy-after-v1, broken supersession, non-owner high-risk plan approval, shared-identity vs native review, argparse both/neither input (exit 2), merge-approval blocked by contract, fetched HEAD mismatch, missing `GITHUB_TOKEN`, unsupported content encoding, paginated non-list, and noncanonical record spacing. Schema required-field omissions must still fail with structured identity; the Python `jsonschema` sentence is not the identity.
 
 Must **not** fail: missing, duplicate, or reordered generic Issue/PR headings (advisory). Must **not** require `plan-round` / `implementation-round` on merge-review receipts. Reintroducing those round fields must fail schema/field-order tests. `quality.check: CI / quality` must fail schema validation.
 
 ### Explicit non-authority
 
-This plan does not authorize: merging without owner plan approval; starting Go before PR #7 smoke, the exact-head evidence comment, and repaired-base golden regeneration; changing rulesets; enabling required checks; tagging or releasing `v0.1.0`; closing Issue #3 or Issue #5; adopting `repo-ops/v0.1.0` in a consumer; keeping Python as a production fallback after stage 3; replacing the Stage 1 oracle except the Issue #11 repaired-base regeneration.
+This plan does not authorize: merging this plan-only pull request without owner `repo-ops.plan-approval.v1` of this file’s exact digest and head and exact-head `repo-ops.merge-review.v1`; starting Stage 3 implementation before that merge; compiling Go on the production policy path; using cache or Python as a fallback; merging a pinless Go production action; storing the pin anywhere other than `actions/repository-policy/artifact.json`; changing rulesets; enabling required checks; tagging or releasing `v0.1.0`; closing Issue #3 or Issue #5; adopting `repo-ops/v0.1.0` in a consumer; publishing the validator artifact except as an owner-only build of trusted `main` after two matching rebuilds; treating plan approval as publication.
 
-If stage 1, 2, or 3 review fails, repair that branch. If compatibility or trust diverges, fix Go until the harness artifacts match. If cutover CI fails, revert the cutover commit. If a defect is found after `v0.1.0` publication (a later Issue #3 gate), do not rewrite that tag.
+If preparation or cutover review fails, repair that branch. If compatibility or trust diverges, fix Go until the harness artifacts match. If cutover CI fails, revert the cutover commit. If a defect is found after `v0.1.0` publication (a later Issue #3 gate), do not rewrite that tag.

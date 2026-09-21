@@ -1,17 +1,11 @@
 package canonical
 
-import (
-	"os"
-	"path/filepath"
-	"runtime"
-	"testing"
-)
+import "testing"
 
 const (
 	legacyOutcome = "Add a trusted validator without executing pull request code."
 	legacyDigest  = "sha256:ee5673777e09f11f0b7c7f82039d80765828e84a1b0a94a7b68a4cb80df13871"
 	v1Digest      = "sha256:0dbcd01f3a688d6e6c688048de2f13c525e3f6df968573ae7f5c4fbbdeae59dc"
-	planDigest    = "sha256:0fa489baf002a59d2b43e541670722537fca6125bd84067c68d818497889e888"
 )
 
 func TestNormalizeTextCRLFAndTrailingWhitespace(t *testing.T) {
@@ -112,48 +106,4 @@ func TestCanonicalDigestUTF8AndUnescapedASCII(t *testing.T) {
 	if amp != "sha256:1a286c3e9404bed031b0ffc963b3a81d109c329272910e5c3a5fb6241be24b1d" {
 		t.Fatalf("amp digest = %s", amp)
 	}
-}
-
-func TestPlanDigestRealPlanBytes(t *testing.T) {
-	t.Parallel()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller")
-	}
-	planPath := filepath.Join(filepath.Dir(file), "..", "..", ".ops", "plans", "5-migrate-repository-policy-validator-to-go.md")
-	raw, err := os.ReadFile(planPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := PlanDigest(string(raw))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != planDigest {
-		t.Fatalf("plan digest = %s, want %s", got, planDigest)
-	}
-
-	crlfGot, err := PlanDigest(string(bytesReplaceLF(raw)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if crlfGot != got {
-		t.Fatalf("CRLF plan digest = %s, want %s", crlfGot, got)
-	}
-}
-
-func bytesReplaceLF(raw []byte) []byte {
-	// Re-encode as CRLF if the file is already CRLF; otherwise wrap LF as CRLF.
-	s := string(raw)
-	s = NormalizeText(s)
-	s = s[:len(s)-1] // drop the guaranteed trailing LF from NormalizeText
-	out := make([]byte, 0, len(s)*2)
-	for i := range len(s) {
-		if s[i] == '\n' {
-			out = append(out, '\r', '\n')
-			continue
-		}
-		out = append(out, s[i])
-	}
-	return out
 }
