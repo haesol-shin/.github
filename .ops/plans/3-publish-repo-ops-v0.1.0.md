@@ -16,7 +16,7 @@ This revision is understood as completing the immutable repo-ops release and its
 - Repository settings: `.github/repo-policy.yml`.
 - Consumer entrypoint: `.github/workflows/repository-policy.yml`.
 - Release folding implementation: `cmd/repo-ops-changelog` and `internal/changelog`.
-- Release fragments: every `*.md` directly under `changelog.d` except `README.md`; the current files are `3-repo-ops-v0.1.0.md`, `5-go-validator.md`, `8-repair-policy-publication.md`, and `11-changelog-machine-record.md`.
+- Release fragments: every filename matching the repository's fragment grammar directly under `changelog.d`, excluding `README.md`; enumerate the exact set from the candidate base immediately before folding.
 - Published bundle inventory: `contracts/v0.1.0/**`, `actions/repository-policy/**`, `.github/workflows/repository-policy.yml`, and `.github/PULL_REQUEST_TEMPLATE.md` at the exact candidate commit.
 
 Execute from a clean checkout of `haesol-shin/.github` whose local `main` equals remote `main`. GitHub comments and reviews carry plan approval, exact-head merge review, owner merge approval, ruleset approval, and exact-candidate release approval; a plan file or passing check never supplies those approvals by itself. The contract defines who may author machine approvals. Ruleset and release approvals must be owner comments on Issue #3 that name the proposed configuration or exact candidate SHA.
@@ -40,7 +40,7 @@ Tag protection and release publication are separate authority gates. After the c
 - Shared-identity review is evidence, not independently authenticated human approval.
 - Trusted validator code and schemas come from immutable pinned sources; pull-request code is never executed by the policy validator.
 - Reusable workflow consumers pin a full commit SHA, never a branch or mutable tag.
-- The initial release folds every validated fragment present in `changelog.d` except `README.md`; the expected filenames are listed under Canonical inputs.
+- The initial release folds every validated fragment enumerated from the candidate base immediately before folding; `README.md` is never a release fragment.
 - This plan does not authorize required-check enforcement, LecturAL production adoption, product deployment, PyPI publication, notice-bot adoption, or agent-skills adoption.
 
 ## Execution
