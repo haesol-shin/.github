@@ -1,2 +1,2 @@
 ## Fixed
-- Allow a release to consume a trusted-base changelog fragment whose historical filename no longer matches current grammar, without weakening validation for added or modified fragments.
+- Apply grammar, content, and ownership to current-side added, modified, renamed, and copied fragments; trusted legacy base fragments are only release-deleted.

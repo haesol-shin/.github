@@ -40,7 +40,7 @@ Tag protection and release publication are separate authority gates. After the c
 - Shared-identity review is evidence, not independently authenticated human approval.
 - Trusted validator code and schemas come from immutable pinned sources; pull-request code is never executed by the policy validator.
 - Reusable workflow consumers pin a full commit SHA, never a branch or mutable tag.
-- Changelog filename grammar and ownership apply to added or modified fragments. A release declaration may delete a fragment already present on its trusted base even if that historical filename no longer matches current grammar. Folding consumes every `*.md` under `changelog.d` except `README.md`, preserves UTF-8, section, atomicity, and sorting safeguards, writes `CHANGELOG.md`, and deletes fragments only after a successful fold.
+- Changelog filename grammar, content, and ownership apply to current-side added, modified, renamed, and copied fragments. Trusted legacy base fragments are only release-deleted. Folding consumes every `*.md` under `changelog.d` except `README.md`, preserves UTF-8, section, atomicity, and sorting safeguards, writes `CHANGELOG.md`, and deletes fragments only after a successful fold.
 - This plan does not authorize required-check enforcement, LecturAL production adoption, product deployment, PyPI publication, notice-bot adoption, or agent-skills adoption.
 
 ## Execution
