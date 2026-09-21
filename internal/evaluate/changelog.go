@@ -73,14 +73,6 @@ func fragmentPath(filename, root string) bool {
 	return !strings.Contains(relative, "/") && strings.HasSuffix(relative, ".md") && relative != "README.md"
 }
 
-func fragmentNameValid(filename, root string) bool {
-	if !fragmentPath(filename, root) {
-		return false
-	}
-	parts := strings.Split(filename, "/")
-	return fragmentFilenamePattern.MatchString(parts[len(parts)-1])
-}
-
 func fragmentContent(state map[string]any, entry map[string]any) (string, bool) {
 	filename := asString(entry["filename"])
 	for _, key := range []string{"file_contents", "fragment_contents"} {
@@ -172,26 +164,21 @@ func validateChangelogState(state map[string]any, policy map[string]any, issue a
 		}
 	}
 
-	owned := append(append([]map[string]any{}, changedFragments...), deletedFragments...)
-	for _, entry := range owned {
+	for _, entry := range changedFragments {
 		filename := asString(entry["filename"])
 		parts := strings.Split(filename, "/")
 		name := parts[len(parts)-1]
 		filenameMatch := fragmentFilenamePattern.FindStringSubmatch(name)
-		if kind != "release" {
-			if filenameMatch == nil {
-				errors = append(errors, "fragment filename must use <issue>-<slug>.md or direct-<slug>.md")
-			} else if direct {
-				if filenameMatch[fragmentFilenamePattern.SubexpIndex("issue")] != "direct" {
-					errors = append(errors, "direct low-risk fragments must use direct-<slug>.md")
-				}
-			} else if issue == nil {
-				errors = append(errors, "issue-backed fragments require a linked issue")
-			} else if filenameMatch[fragmentFilenamePattern.SubexpIndex("issue")] != issueString(issue) {
-				errors = append(errors, "issue-backed fragment filename must begin with the linked issue number")
+		if filenameMatch == nil {
+			errors = append(errors, "fragment filename must use <issue>-<slug>.md or direct-<slug>.md")
+		} else if direct {
+			if filenameMatch[fragmentFilenamePattern.SubexpIndex("issue")] != "direct" {
+				errors = append(errors, "direct low-risk fragments must use direct-<slug>.md")
 			}
-		} else if !fragmentNameValid(filename, root) {
-			errors = append(errors, "release fragment consumption includes an invalid fragment filename")
+		} else if issue == nil {
+			errors = append(errors, "issue-backed fragments require a linked issue")
+		} else if filenameMatch[fragmentFilenamePattern.SubexpIndex("issue")] != issueString(issue) {
+			errors = append(errors, "issue-backed fragment filename must begin with the linked issue number")
 		}
 	}
 

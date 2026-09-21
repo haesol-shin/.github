@@ -287,6 +287,43 @@ func TestFragmentSectionFinding(t *testing.T) {
 	}
 }
 
+func TestReleaseAcceptsTrustedBaseFragmentDeletion(t *testing.T) {
+	for _, filename := range []string{
+		"changelog.d/42-validator.md",
+		"changelog.d/3-repo-ops-v0.1.0.md",
+	} {
+		t.Run(filename, func(t *testing.T) {
+			files := []any{
+				map[string]any{"filename": "CHANGELOG.md", "status": "added"},
+				map[string]any{"filename": filename, "status": "removed"},
+			}
+			state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, nil, "")
+			got := findings(t, state, CheckContract)
+			if len(got) != 0 {
+				t.Fatalf("release deletion of %s: %v", filename, got)
+			}
+		})
+	}
+}
+
+func TestRejectsInvalidIncomingFragmentFilename(t *testing.T) {
+	for _, status := range []string{"added", "modified"} {
+		t.Run(status, func(t *testing.T) {
+			files := []any{
+				map[string]any{"filename": "changelog.d/3-repo-ops-v0.1.0.md", "status": status},
+			}
+			contents := map[string]any{
+				"changelog.d/3-repo-ops-v0.1.0.md": "## Fixed\n- Consume a legacy trusted-base fragment.\n",
+			}
+			state := withChangelogLine(t, "repo-ops.changelog.v1 kind:required value:fragment-added", files, contents, "")
+			got := findings(t, state, CheckContract)
+			if !containsFinding(got, "fragment filename must use <issue>-<slug>.md or direct-<slug>.md") {
+				t.Fatalf("expected incoming filename rejection, got %v", got)
+			}
+		})
+	}
+}
+
 func TestChangelogRecordAcceptsIndentation(t *testing.T) {
 	state := withChangelogLine(t, "    "+fixtureChangelog, nil, nil, "")
 	if got := findings(t, state, CheckContract); len(got) != 0 {
