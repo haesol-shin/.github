@@ -21,7 +21,7 @@ func TestDecodePolicyMatchesRepoPolicy(t *testing.T) {
 		"profile":  "operations",
 		"quality": map[string]any{
 			"check":    "quality",
-			"commands": []any{"python -m unittest discover -s tests -v"},
+			"commands": []any{"go test ./..."},
 		},
 		"review": map[string]any{
 			"shared_identity": true,

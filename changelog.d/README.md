@@ -26,7 +26,7 @@ Ordinary pull requests MUST NOT edit `CHANGELOG.md` or delete fragments. A relea
 From the repository root, the trusted release preparer runs:
 
 ```text
-python actions/repository-policy/changelog.py --version vX.Y.Z --date YYYY-MM-DD
+go run ./cmd/repo-ops-changelog --version vX.Y.Z --date YYYY-MM-DD
 ```
 
 The policy workflows publish machine check contexts `contract` and `merge approval`; the central labels render as `Repository policy / contract` and `Repository policy / merge approval`. Contract evaluation covers current obligations and risk authority, while merge approval additionally requires the successful contract result and an exact-head merge receipt. Pull-request approval comment changes trigger both checks again; removed or edited stale approvals are not current authority.
