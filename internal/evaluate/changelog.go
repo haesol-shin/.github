@@ -179,7 +179,7 @@ func validateChangelogState(state map[string]any, policy map[string]any, issue a
 		errors = append(errors, "fragment deletion is reserved for release changelog declarations")
 	}
 	if kind == "required" && len(changedFragments) == 0 {
-		errors = append(errors, "required changelog declarations need an added or modified fragment")
+		errors = append(errors, "required changelog declarations need an added, modified, renamed, or copied fragment")
 	}
 	if kind == "release" {
 		if len(releaseChangelog) == 0 {

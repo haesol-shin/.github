@@ -105,7 +105,7 @@ const (
 )
 
 var changelogLifecycleFindings = []string{
-	"required changelog declarations need an added or modified fragment",
+	"required changelog declarations need an added, modified, renamed, or copied fragment",
 	"ordinary pull requests must not edit CHANGELOG.md",
 	"fragment deletion is reserved for release changelog declarations",
 	"release changelog declarations must update CHANGELOG.md",
@@ -413,7 +413,7 @@ func TestUnsupportedStatusCannotSatisfyRequiredOrRelease(t *testing.T) {
 		if !containsFinding(got, "changelog file status must be added, modified, renamed, copied, or removed") {
 			t.Fatalf("expected unsupported status finding, got %v", got)
 		}
-		if !containsFinding(got, "required changelog declarations need an added or modified fragment") {
+		if !containsFinding(got, "required changelog declarations need an added, modified, renamed, or copied fragment") {
 			t.Fatalf("unchanged must not satisfy required, got %v", got)
 		}
 	})

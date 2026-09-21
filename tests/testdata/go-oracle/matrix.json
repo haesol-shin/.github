@@ -170,7 +170,7 @@
       "check": "all",
       "exit": 1,
       "findings": [
-        "required changelog declarations need an added or modified fragment"
+        "required changelog declarations need an added, modified, renamed, or copied fragment"
       ],
       "check_conclusion": "failure"
     },
@@ -179,7 +179,7 @@
       "check": "contract",
       "exit": 1,
       "findings": [
-        "required changelog declarations need an added or modified fragment"
+        "required changelog declarations need an added, modified, renamed, or copied fragment"
       ],
       "check_conclusion": "failure"
     },
@@ -189,7 +189,7 @@
       "exit": 1,
       "findings": [
         "contract check did not succeed; merge approval is blocked",
-        "required changelog declarations need an added or modified fragment"
+        "required changelog declarations need an added, modified, renamed, or copied fragment"
       ],
       "check_conclusion": "failure"
     },
