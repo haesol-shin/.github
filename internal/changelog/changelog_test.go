@@ -1,6 +1,7 @@
 package changelog
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -78,6 +79,46 @@ func TestFoldStableDuplicateSafeAndConsumesOnlyFragments(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(fragments, "3-again.md")); err != nil {
 		t.Fatalf("duplicate failure consumed fragment: %v", err)
+	}
+}
+
+func TestFoldRestoresChangelogAndFragmentsAfterConsumeFailure(t *testing.T) {
+	root := t.TempDir()
+	fragments := filepath.Join(root, "changelog.d")
+	if err := os.Mkdir(fragments, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	first := filepath.Join(fragments, "3-first.md")
+	second := filepath.Join(fragments, "3-second.md")
+	firstContent := "## Added\n- First.\n"
+	secondContent := "## Fixed\n- Second.\n"
+	if err := os.WriteFile(first, []byte(firstContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte(secondContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changelogPath := filepath.Join(root, "CHANGELOG.md")
+	existing := "## [v0.0.1] - 2026-09-20\n"
+	if err := os.WriteFile(changelogPath, []byte(existing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	removals := 0
+	_, err := fold(fragments, changelogPath, "v0.1.0", "2026-09-21", func(path string) error {
+		removals++
+		if removals == 2 {
+			return errors.New("injected consume failure")
+		}
+		return os.Remove(path)
+	})
+	if err == nil || !strings.Contains(err.Error(), "injected consume failure") {
+		t.Fatalf("error = %v", err)
+	}
+	for path, want := range map[string]string{first: firstContent, second: secondContent, changelogPath: existing} {
+		data, readErr := os.ReadFile(path)
+		if readErr != nil || string(data) != want {
+			t.Fatalf("%s = %q, %v; want %q", path, data, readErr, want)
+		}
 	}
 }
 

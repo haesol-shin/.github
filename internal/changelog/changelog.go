@@ -141,6 +141,10 @@ func RenderRelease(fragments []Fragment, version, date string) string {
 }
 
 func Fold(root, changelogPath, version, date string) ([]string, error) {
+	return fold(root, changelogPath, version, date, os.Remove)
+}
+
+func fold(root, changelogPath, version, date string, remove func(string) error) ([]string, error) {
 	if !versionPattern.MatchString(version) {
 		return nil, fmt.Errorf("version must match vX.Y.Z")
 	}
@@ -153,6 +157,7 @@ func Fold(root, changelogPath, version, date string) ([]string, error) {
 		return nil, err
 	}
 	existing, err := os.ReadFile(changelogPath)
+	changelogExisted := err == nil
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -173,18 +178,55 @@ func Fold(root, changelogPath, version, date string) ([]string, error) {
 	if prefix != "" && !strings.HasSuffix(prefix, "\n\n") {
 		prefix += "\n"
 	}
+	backups := make(map[string][]byte, len(fragments))
+	for _, fragment := range fragments {
+		data, err := os.ReadFile(fragment.Path)
+		if err != nil {
+			return nil, err
+		}
+		backups[fragment.Path] = data
+	}
 	if err := atomicWrite(changelogPath, prefix+RenderRelease(fragments, version, date)); err != nil {
 		return nil, err
 	}
 
 	consumed := make([]string, 0, len(fragments))
 	for _, fragment := range fragments {
-		if err := os.Remove(fragment.Path); err != nil {
-			return nil, err
+		if err := remove(fragment.Path); err != nil {
+			rollbackErr := restoreFold(changelogPath, existing, changelogExisted, consumed, backups)
+			return nil, errors.Join(err, rollbackErr)
 		}
 		consumed = append(consumed, fragment.Path)
 	}
 	return consumed, nil
+}
+
+func restoreFold(
+	changelogPath string,
+	existing []byte,
+	changelogExisted bool,
+	consumed []string,
+	backups map[string][]byte,
+) error {
+	var restoreErrors []error
+	for _, path := range consumed {
+		if err := atomicWrite(path, string(backups[path])); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Errorf("restore %s: %w", path, err))
+		}
+	}
+	if len(restoreErrors) != 0 {
+		return errors.Join(restoreErrors...)
+	}
+	if changelogExisted {
+		if err := atomicWrite(changelogPath, string(existing)); err != nil {
+			return fmt.Errorf("restore changelog: %w", err)
+		}
+		return nil
+	}
+	if err := os.Remove(changelogPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove new changelog: %w", err)
+	}
+	return nil
 }
 
 func normalizedLines(text string) []string {
