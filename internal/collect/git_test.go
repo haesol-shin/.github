@@ -114,6 +114,76 @@ func TestGitMetadataExactDiffCases(t *testing.T) {
 	}
 }
 
+func TestGitMetadataResourceCapsFailClosed(t *testing.T) {
+	pr, base := resourceCapRemote(t)
+	const generous = int64(1 << 30)
+	cases := []struct {
+		name   string
+		limits gitLimits
+		want   string
+	}{
+		{
+			name: "fetched objects",
+			limits: gitLimits{
+				fetchedObjectBytes: 1,
+				tempDiskBytes:      generous,
+				diffOutputBytes:    generous,
+			},
+			want: "git fetched-object bytes exceeded limit",
+		},
+		{
+			name: "temporary directory",
+			limits: gitLimits{
+				fetchedObjectBytes: generous,
+				tempDiskBytes:      1,
+				diffOutputBytes:    generous,
+			},
+			want: "git temporary-directory bytes exceeded limit",
+		},
+		{
+			name: "diff output",
+			limits: gitLimits{
+				fetchedObjectBytes: generous,
+				tempDiskBytes:      generous,
+				diffOutputBytes:    16,
+			},
+			want: "git diff output bytes exceeded limit",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := gitMetadataWithLimits(context.Background(), pr, "", base, tc.limits)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func resourceCapRemote(t *testing.T) (map[string]any, string) {
+	t.Helper()
+	src := t.TempDir()
+	git := gitTest{t: t, dir: src, env: gitIdentity(t)}
+	git.run("init", "--quiet", "--initial-branch=main")
+	writeFile(t, filepath.Join(src, "payload.txt"), "base\n")
+	git.run("add", ".")
+	git.run("commit", "-m", "base")
+	base := strings.TrimSpace(git.output("rev-parse", "HEAD"))
+	writeFile(t, filepath.Join(src, "payload.txt"), strings.Repeat("changed payload\n", 512))
+	git.run("add", ".")
+	git.run("commit", "-m", "head")
+	head := strings.TrimSpace(git.output("rev-parse", "HEAD"))
+
+	bare := t.TempDir()
+	runGitDir(t, "", gitIdentity(t), "clone", "--bare", "--quiet", src, bare)
+	runGitDir(t, bare, gitIdentity(t), "update-ref", "refs/pull/9/head", head)
+	return map[string]any{
+		"number": 9,
+		"head":   map[string]any{"sha": head},
+		"base":   map[string]any{"repo": map[string]any{"clone_url": bare}},
+	}, base
+}
+
 func expectedDiffDigest(t *testing.T, dir, base, head string) string {
 	t.Helper()
 	cmd := exec.Command("git",

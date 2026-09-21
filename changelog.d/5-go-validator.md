@@ -4,3 +4,4 @@
 
 ## Changed
 - Add live GitHub event and external-git state collection to the Go validator for advisory Stage 2 replay and shadow evaluation; production repository-policy evaluation remains on Python.
+- Add bounded live git collection, a Go-native changelog folding command, and Go-only fixture and event replay coverage while production remains on Python.

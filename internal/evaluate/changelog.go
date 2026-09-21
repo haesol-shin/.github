@@ -6,15 +6,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode"
+
+	"github.com/haesol-shin/.github/internal/changelog"
 )
 
 const changelogRecord = "repo-ops.changelog.v1"
 
-var (
-	fragmentFilenamePattern = regexp.MustCompile(`^(?P<issue>[1-9][0-9]*|direct)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$`)
-	fragmentSectionPattern  = regexp.MustCompile(`^## (?P<section>Added|Changed|Deprecated|Removed|Fixed|Security)$`)
-)
+var fragmentFilenamePattern = regexp.MustCompile(`^(?P<issue>[1-9][0-9]*|direct)-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$`)
 
 func parseChangelogDeclaration(body, contractRoot string, orders map[string][]string) (map[string]string, []string) {
 	var candidates []string
@@ -203,8 +201,8 @@ func validateChangelogState(state map[string]any, policy map[string]any, issue a
 			errors = append(errors, "fragment content is unavailable for "+asString(entry["filename"]))
 			continue
 		}
-		if err := parseFragment(content, asString(entry["filename"])); err != "" {
-			errors = append(errors, err)
+		if _, err := changelog.ParseFragment(content, asString(entry["filename"])); err != nil {
+			errors = append(errors, err.Error())
 		}
 	}
 	return errors
@@ -215,63 +213,4 @@ func issueString(v any) string {
 		return strconv.Itoa(n)
 	}
 	return fmt.Sprint(v)
-}
-
-func parseFragment(text, filename string) string {
-	lines := strings.Split(strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n"), "\n")
-	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
-		lines = lines[:len(lines)-1]
-	}
-	empty := true
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			empty = false
-			break
-		}
-	}
-	if len(lines) == 0 || empty {
-		return filename + ": fragment is empty"
-	}
-	sections := map[string][]string{}
-	var order []string
-	current := ""
-	for i, line := range lines {
-		number := i + 1
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		if heading := fragmentSectionPattern.FindStringSubmatch(line); heading != nil && fragmentSectionPattern.MatchString(line) {
-			current = heading[fragmentSectionPattern.SubexpIndex("section")]
-			if _, exists := sections[current]; exists {
-				return fmt.Sprintf("%s:%d: duplicate %s heading", filename, number, current)
-			}
-			sections[current] = []string{}
-			order = append(order, current)
-			continue
-		}
-		if current == "" {
-			return fmt.Sprintf("%s:%d: content must follow an allowed section heading", filename, number)
-		}
-		if !strings.HasPrefix(line, "- ") || strings.TrimSpace(line[2:]) == "" {
-			return fmt.Sprintf("%s:%d: each fragment entry must be a non-empty `- ` bullet", filename, number)
-		}
-		sections[current] = append(sections[current], rstrip(line))
-	}
-	if len(sections) == 0 {
-		return filename + ": fragment has no allowed section heading"
-	}
-	var emptySections []string
-	for _, section := range order {
-		if len(sections[section]) == 0 {
-			emptySections = append(emptySections, section)
-		}
-	}
-	if len(emptySections) > 0 {
-		return filename + ": section(s) have no non-empty bullet: " + strings.Join(emptySections, ", ")
-	}
-	return ""
-}
-
-func rstrip(s string) string {
-	return strings.TrimRightFunc(s, unicode.IsSpace)
 }
