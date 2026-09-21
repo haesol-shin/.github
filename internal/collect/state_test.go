@@ -304,6 +304,84 @@ func TestPermissionFailureDoesNotFailBuild(t *testing.T) {
 	}
 }
 
+func TestBuildLiveStateRetainsRenameAndHydratesFragment(t *testing.T) {
+	renamed := "## Added\n- Renamed fragment.\n"
+	copied := "## Changed\n- Copied fragment.\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "repo-policy.yml"):
+			writeContent(w, "contract: x\nchangelog:\n  mode: fragments\n  root: changelog.d\n")
+		case strings.Contains(r.URL.Path, "/files"):
+			io.WriteString(w, `[
+				{"filename":"changelog.d/3-new.md","previous_filename":"changelog.d/3-old.md","status":"renamed","additions":1,"deletions":0,"changes":1},
+				{"filename":"changelog.d/3-copy.md","previous_filename":"changelog.d/3-src.md","status":"copied","additions":1,"deletions":0,"changes":1},
+				{"filename":"README.md","previous_filename":"README.old","status":"renamed","additions":0,"deletions":0,"changes":0}
+			]`)
+		case strings.Contains(r.URL.Path, "/contents/changelog.d/3-new.md"):
+			writeContent(w, renamed)
+		case strings.Contains(r.URL.Path, "/contents/changelog.d/3-copy.md"):
+			writeContent(w, copied)
+		case strings.Contains(r.URL.Path, "/contents/changelog.d/"):
+			http.Error(w, "should not load previous fragment", http.StatusNotFound)
+		case strings.Contains(r.URL.Path, "/compare/"):
+			fmt.Fprintf(w, `{"merge_base_commit":{"sha":%q}}`, mergeSHA)
+		case strings.Contains(r.URL.Path, "/comments"):
+			io.WriteString(w, `[]`)
+		case strings.Contains(r.URL.Path, "/reviews"):
+			io.WriteString(w, `[]`)
+		case strings.Contains(r.URL.Path, "/check-runs"):
+			io.WriteString(w, `{"check_runs":[]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	event := map[string]any{
+		"repository": map[string]any{"full_name": "o/r"},
+		"pull_request": map[string]any{
+			"number": 4,
+			"body":   "Risk: low — n\n\nDirect low-risk PR: yes\n",
+			"user":   map[string]any{"login": "a"},
+			"base":   map[string]any{"sha": baseSHA, "repo": map[string]any{"clone_url": "https://github.com/o/r.git"}},
+			"head":   map[string]any{"sha": headSHA},
+		},
+	}
+	state, err := BuildLiveState(context.Background(), writeEvent(t, event), testEnv(server.URL), NewGitHubClient(testToken, server.URL, server.Client()), stubGit{base: mergeSHA, digest: "sha256:x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]map[string]any{}
+	files, _ := state["files"].([]any)
+	for _, item := range files {
+		entry := asMap(item)
+		if entry == nil {
+			continue
+		}
+		byName[asString(entry["filename"])] = entry
+	}
+	if asString(byName["changelog.d/3-new.md"]["status"]) != "renamed" ||
+		asString(byName["changelog.d/3-new.md"]["previous_filename"]) != "changelog.d/3-old.md" {
+		t.Fatalf("renamed fragment %#v", byName["changelog.d/3-new.md"])
+	}
+	if asString(byName["changelog.d/3-copy.md"]["status"]) != "copied" ||
+		asString(byName["changelog.d/3-copy.md"]["previous_filename"]) != "changelog.d/3-src.md" {
+		t.Fatalf("copied fragment %#v", byName["changelog.d/3-copy.md"])
+	}
+	if asString(byName["README.md"]["previous_filename"]) != "README.old" {
+		t.Fatalf("non-fragment rename %#v", byName["README.md"])
+	}
+	contents := asMap(state["file_contents"])
+	if contents["changelog.d/3-new.md"] != renamed || contents["changelog.d/3-copy.md"] != copied {
+		t.Fatalf("hydrated contents %#v", contents)
+	}
+	if _, ok := contents["changelog.d/3-old.md"]; ok {
+		t.Fatal("previous rename path should not be hydrated")
+	}
+	if _, ok := contents["README.md"]; ok {
+		t.Fatal("non-fragment should not be hydrated")
+	}
+}
+
 type stubGit struct {
 	base, digest string
 	err          error

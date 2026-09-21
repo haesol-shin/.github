@@ -307,7 +307,7 @@ func TestReleaseAcceptsTrustedBaseFragmentDeletion(t *testing.T) {
 }
 
 func TestRejectsInvalidIncomingFragmentFilename(t *testing.T) {
-	for _, status := range []string{"added", "modified"} {
+	for _, status := range []string{"added", "modified", "renamed", "copied"} {
 		t.Run(status, func(t *testing.T) {
 			files := []any{
 				map[string]any{"filename": "changelog.d/3-repo-ops-v0.1.0.md", "status": status},
@@ -317,6 +317,33 @@ func TestRejectsInvalidIncomingFragmentFilename(t *testing.T) {
 			}
 			state := withChangelogLine(t, "repo-ops.changelog.v1 kind:required value:fragment-added", files, contents, "")
 			got := findings(t, state, CheckContract)
+			if !containsFinding(got, "fragment filename must use <issue>-<slug>.md or direct-<slug>.md") {
+				t.Fatalf("expected incoming filename rejection, got %v", got)
+			}
+		})
+	}
+}
+
+func TestReleaseRenameCannotBypassIncomingFilenameValidation(t *testing.T) {
+	for _, status := range []string{"renamed", "copied"} {
+		t.Run(status, func(t *testing.T) {
+			files := []any{
+				map[string]any{"filename": "CHANGELOG.md", "status": "added"},
+				map[string]any{"filename": "changelog.d/5-go-validator.md", "status": "removed"},
+				map[string]any{
+					"filename":          "changelog.d/3-repo-ops-v0.1.0.md",
+					"status":            status,
+					"previous_filename": "changelog.d/11-changelog-machine-record.md",
+				},
+			}
+			contents := map[string]any{
+				"changelog.d/3-repo-ops-v0.1.0.md": "## Fixed\n- Consume a legacy trusted-base fragment.\n",
+			}
+			state := withChangelogLine(t, "repo-ops.changelog.v1 kind:release value:v0.1.0", files, contents, "")
+			got := findings(t, state, CheckContract)
+			if !containsFinding(got, "release changelog declarations must consume, not modify, fragments") {
+				t.Fatalf("expected consume-not-modify rejection, got %v", got)
+			}
 			if !containsFinding(got, "fragment filename must use <issue>-<slug>.md or direct-<slug>.md") {
 				t.Fatalf("expected incoming filename rejection, got %v", got)
 			}

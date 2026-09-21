@@ -128,16 +128,22 @@ func validateChangelogState(state map[string]any, policy map[string]any, issue a
 		filename := asString(entry["filename"])
 		status := strings.ToLower(asString(entry["status"]))
 		if fragmentPath(filename, root) {
-			if status == "added" || status == "modified" {
+			if status != "" && status != "removed" {
 				changedFragments = append(changedFragments, entry)
 			}
 			if status == "removed" {
 				deletedFragments = append(deletedFragments, entry)
 			}
 		}
+		if previous := asString(entry["previous_filename"]); previous != "" && fragmentPath(previous, root) {
+			deletedFragments = append(deletedFragments, map[string]any{
+				"filename": previous,
+				"status":   "removed",
+			})
+		}
 		if normalizeSlash(filename) == "CHANGELOG.md" {
 			directChangelog = append(directChangelog, entry)
-			if status == "added" || status == "modified" {
+			if status != "" && status != "removed" {
 				releaseChangelog = append(releaseChangelog, entry)
 			}
 		}
