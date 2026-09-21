@@ -117,6 +117,7 @@ func TestGitMetadataExactDiffCases(t *testing.T) {
 func TestGitMetadataResourceCapsFailClosed(t *testing.T) {
 	pr, base := resourceCapRemote(t)
 	const generous = int64(1 << 30)
+	const generousEntries = 1 << 20
 	cases := []struct {
 		name   string
 		limits gitLimits
@@ -125,42 +126,57 @@ func TestGitMetadataResourceCapsFailClosed(t *testing.T) {
 		{
 			name: "fetched objects",
 			limits: gitLimits{
-				fetchedObjectBytes: 1,
-				tempDiskBytes:      generous,
-				diffInputBytes:     generous,
-				diffOutputBytes:    generous,
+				fetchedObjectBytes:  1,
+				tempDiskBytes:       generous,
+				diffInputBytes:      generous,
+				expandedTreeEntries: generousEntries,
+				diffOutputBytes:     generous,
 			},
 			want: "git fetched-object bytes exceeded limit",
 		},
 		{
 			name: "temporary directory",
 			limits: gitLimits{
-				fetchedObjectBytes: generous,
-				tempDiskBytes:      1,
-				diffInputBytes:     generous,
-				diffOutputBytes:    generous,
+				fetchedObjectBytes:  generous,
+				tempDiskBytes:       1,
+				diffInputBytes:      generous,
+				expandedTreeEntries: generousEntries,
+				diffOutputBytes:     generous,
 			},
 			want: "git temporary-directory bytes exceeded limit",
 		},
 		{
 			name: "diff output",
 			limits: gitLimits{
-				fetchedObjectBytes: generous,
-				tempDiskBytes:      generous,
-				diffInputBytes:     generous,
-				diffOutputBytes:    16,
+				fetchedObjectBytes:  generous,
+				tempDiskBytes:       generous,
+				diffInputBytes:      generous,
+				expandedTreeEntries: generousEntries,
+				diffOutputBytes:     16,
 			},
 			want: "git diff output bytes exceeded limit",
 		},
 		{
 			name: "logical changed blobs",
 			limits: gitLimits{
-				fetchedObjectBytes: generous,
-				tempDiskBytes:      generous,
-				diffInputBytes:     1024 * 1024,
-				diffOutputBytes:    generous,
+				fetchedObjectBytes:  generous,
+				tempDiskBytes:       generous,
+				diffInputBytes:      1024 * 1024,
+				expandedTreeEntries: generousEntries,
+				diffOutputBytes:     generous,
 			},
 			want: "git logical changed-blob bytes exceeded limit",
+		},
+		{
+			name: "expanded tree entries",
+			limits: gitLimits{
+				fetchedObjectBytes:  generous,
+				tempDiskBytes:       generous,
+				diffInputBytes:      generous,
+				expandedTreeEntries: 1,
+				diffOutputBytes:     generous,
+			},
+			want: "git expanded tree entries exceeded limit",
 		},
 	}
 	for _, tc := range cases {
@@ -196,12 +212,50 @@ func TestGitMetadataCountsRepeatedBlobPerPath(t *testing.T) {
 	}
 	const generous = int64(1 << 30)
 	_, _, err := gitMetadataWithLimits(context.Background(), pr, "", base, gitLimits{
-		fetchedObjectBytes: generous,
-		tempDiskBytes:      generous,
-		diffInputBytes:     int64(len(content) * 2),
-		diffOutputBytes:    generous,
+		fetchedObjectBytes:  generous,
+		tempDiskBytes:       generous,
+		diffInputBytes:      int64(len(content) * 2),
+		expandedTreeEntries: 1 << 20,
+		diffOutputBytes:     generous,
 	})
 	if err == nil || !strings.Contains(err.Error(), "git logical changed-blob bytes exceeded limit") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGitMetadataCountsRepeatedSubtreePerPath(t *testing.T) {
+	src := t.TempDir()
+	git := gitTest{t: t, dir: src, env: gitIdentity(t)}
+	git.run("init", "--quiet", "--initial-branch=main")
+	git.run("commit", "--allow-empty", "-m", "base")
+	base := strings.TrimSpace(git.output("rev-parse", "HEAD"))
+	for _, directory := range []string{"one", "two", "three"} {
+		parent := filepath.Join(src, directory, "nested")
+		if err := os.MkdirAll(parent, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(parent, "payload.txt"), "same\n")
+	}
+	git.run("add", ".")
+	git.run("commit", "-m", "head")
+	head := strings.TrimSpace(git.output("rev-parse", "HEAD"))
+	bare := t.TempDir()
+	runGitDir(t, "", gitIdentity(t), "clone", "--bare", "--quiet", src, bare)
+	runGitDir(t, bare, gitIdentity(t), "update-ref", "refs/pull/11/head", head)
+	pr := map[string]any{
+		"number": 11,
+		"head":   map[string]any{"sha": head},
+		"base":   map[string]any{"repo": map[string]any{"clone_url": bare}},
+	}
+	const generous = int64(1 << 30)
+	_, _, err := gitMetadataWithLimits(context.Background(), pr, "", base, gitLimits{
+		fetchedObjectBytes:  generous,
+		tempDiskBytes:       generous,
+		diffInputBytes:      generous,
+		expandedTreeEntries: 5,
+		diffOutputBytes:     generous,
+	})
+	if err == nil || !strings.Contains(err.Error(), "git expanded tree entries exceeded limit") {
 		t.Fatalf("error = %v", err)
 	}
 }

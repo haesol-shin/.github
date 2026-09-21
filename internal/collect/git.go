@@ -20,28 +20,32 @@ import (
 
 // The byte caps are 16× the largest measured PR 13/14 preparation sample:
 // 409447 aggregate object bytes, 240422 temporary bytes, 438762 logical
-// changed-blob bytes with per-path multiplicity, and 383732 diff-output bytes.
+// changed-blob bytes with per-path multiplicity, 199 expanded tree entries,
+// and 383732 diff-output bytes.
 const (
-	gitReadSize                 = 1024 * 1024
-	maxFetchedObjectBytes int64 = 6551152
-	maxTempDiskBytes      int64 = 3846752
-	maxDiffInputBytes     int64 = 7020192
-	maxDiffOutputBytes    int64 = 6139712
-	diskPollInterval            = 5 * time.Millisecond
+	gitReadSize                  = 1024 * 1024
+	maxFetchedObjectBytes  int64 = 6551152
+	maxTempDiskBytes       int64 = 3846752
+	maxDiffInputBytes      int64 = 7020192
+	maxExpandedTreeEntries       = 3184
+	maxDiffOutputBytes     int64 = 6139712
+	diskPollInterval             = 5 * time.Millisecond
 )
 
 type gitLimits struct {
-	fetchedObjectBytes int64
-	tempDiskBytes      int64
-	diffInputBytes     int64
-	diffOutputBytes    int64
+	fetchedObjectBytes  int64
+	tempDiskBytes       int64
+	diffInputBytes      int64
+	expandedTreeEntries int
+	diffOutputBytes     int64
 }
 
 var productionGitLimits = gitLimits{
-	fetchedObjectBytes: maxFetchedObjectBytes,
-	tempDiskBytes:      maxTempDiskBytes,
-	diffInputBytes:     maxDiffInputBytes,
-	diffOutputBytes:    maxDiffOutputBytes,
+	fetchedObjectBytes:  maxFetchedObjectBytes,
+	tempDiskBytes:       maxTempDiskBytes,
+	diffInputBytes:      maxDiffInputBytes,
+	expandedTreeEntries: maxExpandedTreeEntries,
+	diffOutputBytes:     maxDiffOutputBytes,
 }
 
 func (g *GitRunner) Metadata(ctx context.Context, pullRequest map[string]any, token, mergeBase string) (string, string, error) {
@@ -212,48 +216,103 @@ func gitDiffDigest(ctx context.Context, directory string, env []string, limits g
 	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), nil
 }
 
+type gitTreeEntry struct {
+	object string
+	kind   string
+}
+
+type gitTreePair struct {
+	base string
+	head string
+}
+
 func checkDiffInputBytes(ctx context.Context, directory string, env []string, limits gitLimits) error {
-	raw, err := gitBoundedOutput(
-		ctx,
-		directory,
-		env,
-		limits.tempDiskBytes,
-		maxDiffOutputBytes,
-		"",
-		"diff-tree",
-		"-r",
-		"--raw",
-		"--full-index",
-		"--no-commit-id",
-		"--no-renames",
-		"refs/repo-ops/base",
-		"refs/repo-ops/head",
-		"--",
-	)
-	if err != nil {
-		return fmt.Errorf("git diff-tree: %w", err)
+	resolveTree := func(ref string) (string, error) {
+		output, err := gitBoundedOutput(
+			ctx,
+			directory,
+			env,
+			limits.tempDiskBytes,
+			128,
+			"",
+			"rev-parse",
+			ref+"^{tree}",
+		)
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(output), nil
 	}
-	var names []string
-	zero := strings.Repeat("0", 40)
-	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
-		if line == "" {
+	baseTree, err := resolveTree("refs/repo-ops/base")
+	if err != nil {
+		return fmt.Errorf("resolve base tree: %w", err)
+	}
+	headTree, err := resolveTree("refs/repo-ops/head")
+	if err != nil {
+		return fmt.Errorf("resolve head tree: %w", err)
+	}
+
+	queue := []gitTreePair{{base: baseTree, head: headTree}}
+	expanded := 0
+	var blobs []string
+	for len(queue) > 0 {
+		pair := queue[len(queue)-1]
+		queue = queue[:len(queue)-1]
+		if pair.base == pair.head {
 			continue
 		}
-		metadata := strings.Fields(strings.SplitN(line, "\t", 2)[0])
-		if len(metadata) < 5 || !strings.HasPrefix(metadata[0], ":") {
-			return fmt.Errorf("git diff-tree returned malformed metadata")
+		baseEntries, err := gitTreeEntries(ctx, directory, env, limits.tempDiskBytes, pair.base)
+		if err != nil {
+			return err
 		}
-		for _, object := range metadata[2:4] {
-			if object != zero {
-				names = append(names, object)
+		headEntries, err := gitTreeEntries(ctx, directory, env, limits.tempDiskBytes, pair.head)
+		if err != nil {
+			return err
+		}
+		expanded += len(baseEntries) + len(headEntries)
+		if expanded > limits.expandedTreeEntries {
+			return fmt.Errorf(
+				"git expanded tree entries exceeded limit (%d > %d)",
+				expanded,
+				limits.expandedTreeEntries,
+			)
+		}
+
+		names := make(map[string]struct{}, len(baseEntries)+len(headEntries))
+		for name := range baseEntries {
+			names[name] = struct{}{}
+		}
+		for name := range headEntries {
+			names[name] = struct{}{}
+		}
+		for name := range names {
+			base := baseEntries[name]
+			head := headEntries[name]
+			if base == head {
+				continue
+			}
+			baseTree := ""
+			headTree := ""
+			if base.kind == "tree" {
+				baseTree = base.object
+			} else if base.kind == "blob" {
+				blobs = append(blobs, base.object)
+			}
+			if head.kind == "tree" {
+				headTree = head.object
+			} else if head.kind == "blob" {
+				blobs = append(blobs, head.object)
+			}
+			if baseTree != "" || headTree != "" {
+				queue = append(queue, gitTreePair{base: baseTree, head: headTree})
 			}
 		}
 	}
-	if len(names) == 0 {
+	if len(blobs) == 0 {
 		return nil
 	}
-	sort.Strings(names)
-	input := strings.Join(names, "\n") + "\n"
+	sort.Strings(blobs)
+	input := strings.Join(blobs, "\n") + "\n"
 	checked, err := gitBoundedOutput(
 		ctx,
 		directory,
@@ -270,11 +329,8 @@ func checkDiffInputBytes(ctx context.Context, directory string, env []string, li
 	total := int64(0)
 	for _, line := range strings.Split(strings.TrimSpace(checked), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) != 3 {
-			return fmt.Errorf("git cat-file returned malformed metadata")
-		}
-		if fields[1] != "blob" {
-			continue
+		if len(fields) != 3 || fields[1] != "blob" {
+			return fmt.Errorf("git cat-file returned malformed blob metadata")
 		}
 		size, err := strconv.ParseInt(fields[2], 10, 64)
 		if err != nil || size < 0 {
@@ -291,6 +347,48 @@ func checkDiffInputBytes(ctx context.Context, directory string, env []string, li
 		total += size
 	}
 	return nil
+}
+
+func gitTreeEntries(
+	ctx context.Context,
+	directory string,
+	env []string,
+	diskLimit int64,
+	tree string,
+) (map[string]gitTreeEntry, error) {
+	if tree == "" {
+		return map[string]gitTreeEntry{}, nil
+	}
+	output, err := gitBoundedOutput(
+		ctx,
+		directory,
+		env,
+		diskLimit,
+		maxDiffOutputBytes,
+		"",
+		"ls-tree",
+		"-z",
+		tree,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("git ls-tree: %w", err)
+	}
+	entries := make(map[string]gitTreeEntry)
+	for _, record := range strings.Split(output, "\x00") {
+		if record == "" {
+			continue
+		}
+		metadata, name, ok := strings.Cut(record, "\t")
+		fields := strings.Fields(metadata)
+		if !ok || len(fields) != 3 || name == "" {
+			return nil, fmt.Errorf("git ls-tree returned malformed metadata")
+		}
+		if _, duplicate := entries[name]; duplicate {
+			return nil, fmt.Errorf("git ls-tree returned a duplicate entry")
+		}
+		entries[name] = gitTreeEntry{object: fields[2], kind: fields[1]}
+	}
+	return entries, nil
 }
 
 func gitBoundedOutput(
