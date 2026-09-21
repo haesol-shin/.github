@@ -97,7 +97,18 @@ runs:
         prefix="${record_dir}/sample-${SAMPLE}-${PHASE}"
         end_ns="$(date +%s%N)"
         touch "${prefix}.stop"
-        wait "$(cat "${prefix}.monitor-pid")"
+        monitor_pid="$(cat "${prefix}.monitor-pid")"
+        for _ in {1..1000}; do
+          if ! kill -0 "$monitor_pid" 2>/dev/null; then
+            break
+          fi
+          sleep 0.01
+        done
+        if kill -0 "$monitor_pid" 2>/dev/null; then
+          kill "$monitor_pid" 2>/dev/null || true
+          echo "RSS monitor did not stop" >&2
+          exit 1
+        fi
         start_ns="$(cat "${prefix}.start-ns")"
         peak_rss_kib="$(cat "${prefix}.rss-kib")"
         observed="$(cat "${prefix}.observed")"
