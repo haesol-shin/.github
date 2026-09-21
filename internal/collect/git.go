@@ -18,14 +18,16 @@ import (
 	"time"
 )
 
-// The byte caps are 16× the largest measured PR 13/14 preparation sample:
-// 409447 aggregate object bytes, 240422 temporary bytes, 438762 logical
-// changed-blob bytes with per-path multiplicity, 199 expanded tree entries,
-// and 383732 diff-output bytes.
+// The resource caps are 16× the largest measured PR 13/14 preparation sample:
+// 409447 aggregate object bytes, 240422 temporary bytes, 7853 logical tree
+// bytes with per-path multiplicity, 438762 logical changed-blob bytes with
+// per-path multiplicity, 199 expanded tree entries, and 383732 diff-output
+// bytes.
 const (
 	gitReadSize                  = 1024 * 1024
 	maxFetchedObjectBytes  int64 = 6551152
 	maxTempDiskBytes       int64 = 3846752
+	maxExpandedTreeBytes   int64 = 125648
 	maxDiffInputBytes      int64 = 7020192
 	maxExpandedTreeEntries       = 3184
 	maxDiffOutputBytes     int64 = 6139712
@@ -35,6 +37,7 @@ const (
 type gitLimits struct {
 	fetchedObjectBytes  int64
 	tempDiskBytes       int64
+	expandedTreeBytes   int64
 	diffInputBytes      int64
 	expandedTreeEntries int
 	diffOutputBytes     int64
@@ -43,6 +46,7 @@ type gitLimits struct {
 var productionGitLimits = gitLimits{
 	fetchedObjectBytes:  maxFetchedObjectBytes,
 	tempDiskBytes:       maxTempDiskBytes,
+	expandedTreeBytes:   maxExpandedTreeBytes,
 	diffInputBytes:      maxDiffInputBytes,
 	expandedTreeEntries: maxExpandedTreeEntries,
 	diffOutputBytes:     maxDiffOutputBytes,
@@ -253,13 +257,32 @@ func checkDiffInputBytes(ctx context.Context, directory string, env []string, li
 	}
 
 	queue := []gitTreePair{{base: baseTree, head: headTree}}
-	expanded := 0
+	expandedBytes := int64(0)
+	expandedEntries := 0
 	var blobs []string
 	for len(queue) > 0 {
 		pair := queue[len(queue)-1]
 		queue = queue[:len(queue)-1]
 		if pair.base == pair.head {
 			continue
+		}
+		for _, tree := range []string{pair.base, pair.head} {
+			if tree == "" {
+				continue
+			}
+			size, err := gitObjectSize(ctx, directory, env, limits.tempDiskBytes, tree)
+			if err != nil {
+				return fmt.Errorf("git tree size: %w", err)
+			}
+			if size > limits.expandedTreeBytes-expandedBytes {
+				return fmt.Errorf(
+					"git expanded tree bytes exceeded limit (%d + %d > %d)",
+					expandedBytes,
+					size,
+					limits.expandedTreeBytes,
+				)
+			}
+			expandedBytes += size
 		}
 		baseEntries, err := gitTreeEntries(ctx, directory, env, limits.tempDiskBytes, pair.base)
 		if err != nil {
@@ -269,15 +292,14 @@ func checkDiffInputBytes(ctx context.Context, directory string, env []string, li
 		if err != nil {
 			return err
 		}
-		expanded += len(baseEntries) + len(headEntries)
-		if expanded > limits.expandedTreeEntries {
+		expandedEntries += len(baseEntries) + len(headEntries)
+		if expandedEntries > limits.expandedTreeEntries {
 			return fmt.Errorf(
 				"git expanded tree entries exceeded limit (%d > %d)",
-				expanded,
+				expandedEntries,
 				limits.expandedTreeEntries,
 			)
 		}
-
 		names := make(map[string]struct{}, len(baseEntries)+len(headEntries))
 		for name := range baseEntries {
 			names[name] = struct{}{}
@@ -347,6 +369,34 @@ func checkDiffInputBytes(ctx context.Context, directory string, env []string, li
 		total += size
 	}
 	return nil
+}
+
+func gitObjectSize(
+	ctx context.Context,
+	directory string,
+	env []string,
+	diskLimit int64,
+	object string,
+) (int64, error) {
+	output, err := gitBoundedOutput(
+		ctx,
+		directory,
+		env,
+		diskLimit,
+		64,
+		"",
+		"cat-file",
+		"-s",
+		object,
+	)
+	if err != nil {
+		return 0, err
+	}
+	size, err := strconv.ParseInt(strings.TrimSpace(output), 10, 64)
+	if err != nil || size < 0 {
+		return 0, fmt.Errorf("git cat-file returned invalid object size")
+	}
+	return size, nil
 }
 
 func gitTreeEntries(
